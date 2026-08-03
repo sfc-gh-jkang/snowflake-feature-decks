@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Freshness declaration. Uncomment for in-repo concept docs so
+       check_freshness.py can detect drift, dangling refs, and overdue review.
+       Omit entirely for standalone published decks (no code to drift against).
+  <meta name="doc-covers" content="src/events/**,src/state/reducer.ts">
+  <meta name="doc-symbols" content="EventRouter,dispatchEvent">
+  <meta name="doc-review-by" content="2027-01-01">
+  -->
+  <title>Preventing Data Download to Unmanaged Devices</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Egress Controls</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Contents</div>
+      <a href="#hero">Overview</a>
+      <a href="#the-real-question">The Real Question</a>
+      <a href="#wrong-first-move">Wrong First Move</a>
+      <a href="#layer-1-identity">Layer 1: Identity</a>
+      <a href="#layer-2-network">Layer 2: Network</a>
+      <a href="#layer-3-session">Layer 3: Session</a>
+      <a href="#layer-4-data-limits">Layer 4: Data Limits</a>
+      <a href="#layer-5-egress-params">Layer 5: Egress Params</a>
+      <a href="#layer-6-audit">Layer 6: Audit</a>
+      <a href="#what-snowflake-cannot-do">What Snowflake Cannot Do</a>
+      <a href="#hardening-sequence">Hardening Sequence</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>Preventing Data Download to Unmanaged Devices</h1>
+      <p class="subtitle">You cannot turn off the download button. You can make sure the person holding the phone never gets a session in the first place &mdash; and that is a stronger control anyway.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">Any device</div><div class="stat-label">Snowflake default inbound access</div></div>
+        <div class="stat-card"><div class="stat-value">18 h</div><div class="stat-label">Default Snowsight idle timeout</div></div>
+        <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Layers that actually move the needle</div></div>
+        <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Settings that disable "Download Results"</div></div>
+      </div>
+    </section>
+
+    <section class="slide" id="the-real-question">
+      <h2>The Real Question</h2>
+      <p style="margin-bottom: 1.5rem;">Security teams usually arrive with a specific ask: <em>stop people downloading company data onto a phone.</em> That is a reasonable goal, but it is phrased as a UI problem, and the UI is the one place Snowflake gives you no switch.</p>
+      <p style="margin-bottom: 1.5rem;">Reframing it as an <strong>access</strong> problem makes it solvable, because a download requires four things to line up first:</p>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step">
+          <div class="step-label">1</div>
+          <div class="step-title">A reachable endpoint</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">2</div>
+          <div class="step-title">A successful authentication</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">3</div>
+          <div class="step-title">A live session</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active">
+          <div class="step-label">4</div>
+          <div class="step-title">Readable data in the result</div>
+        </div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>Take away:</strong> break any one of the first three and step four never happens. Every control in this deck attacks steps 1&ndash;3. Attacking step 4 alone &mdash; the download button &mdash; is the only approach that does not work.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="wrong-first-move">
+      <h2>Why "Block the UI" Is the Wrong First Move</h2>
+      <p style="margin-bottom: 1.5rem;">The instinct is to restrict the web UI with an authentication policy. It is worth doing, but if it is your <em>only</em> control you have bought less than you think. Snowflake says so explicitly, three separate times on one page.</p>
+      <div class="warning-box anim-fade">
+        <p><strong>Verbatim from the Snowflake docs:</strong> "The <code>CLIENT_TYPES</code> property of an authentication policy is a <strong>best-effort method</strong> to block user logins based on specific clients. It <strong>should not be used as the sole control to establish a security boundary</strong>. Notably, <strong>it does not restrict access to the Snowflake REST APIs.</strong>"</p>
+      </div>
+      <p style="margin-bottom: 1.5rem;">A phone with a valid credential can call the SQL REST API and receive JSON. No browser involved, so no browser control applies. That is why identity and network come first.</p>
+      <table class="evidence anim-fade">
+        <thead><tr><th>Control</th><th>Stops browser download?</th><th>Stops REST API?</th><th>Stops driver / CLI?</th></tr></thead>
+        <tbody>
+          <tr><td>CLIENT_TYPES</td><td>Partly (best-effort)</td><td><span class="badge-red">No</span></td><td>Partly</td></tr>
+          <tr><td>Network policy</td><td><span class="badge-green">Yes</span></td><td><span class="badge-green">Yes</span></td><td><span class="badge-green">Yes</span></td></tr>
+          <tr><td>IdP device compliance</td><td><span class="badge-green">Yes</span></td><td>Only for IdP-brokered auth</td><td>Only for IdP-brokered auth</td></tr>
+          <tr><td>Unload parameters</td><td>Blocks bulk export path</td><td><span class="badge-green">Yes</span></td><td><span class="badge-green">Yes</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="slide" id="layer-1-identity">
+      <h2>Layer 1 &mdash; Identity: Where Device Posture Actually Lives</h2>
+      <p style="margin-bottom: 1.5rem;">Snowflake does not evaluate whether a device is corporate-managed, encrypted, jailbroken, or MDM-enrolled. It has no concept of device posture. Your identity provider does, and Snowflake honours the outcome by trusting the federated assertion.</p>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Snowflake's job</h4>
+          <p>Accept or reject an authentication method. Restrict which IdP a user may use. Enforce MFA. Nothing device-aware.</p>
+        </div>
+        <div class="card">
+          <h4>The IdP's job</h4>
+          <p>Decide whether <em>this device</em> is allowed to complete the login at all &mdash; compliant, managed, hybrid-joined, or blocked.</p>
+        </div>
+        <div class="card">
+          <h4>Why this ordering wins</h4>
+          <p>A personal phone fails the check before a Snowflake session exists. There is no result set to download.</p>
+        </div>
+      </div>
+      <p style="margin: 1.5rem 0;">With Microsoft Entra ID, the relevant grant control is <strong>Require device to be marked as compliant</strong>, which supports iOS, Android, Windows, macOS and Linux devices registered with Entra ID and enrolled in Intune. Okta, Ping and others expose an equivalent device-trust condition.</p>
+      <div class="warning-box anim-fade">
+        <p><strong>The gap that quietly undoes all of it:</strong> any user who still holds a <em>local Snowflake password</em> can bypass the IdP entirely, and with it every Conditional Access rule you wrote. Federating the IdP is only half the job &mdash; you must also remove password as an allowed authentication method for human users.</p>
+      </div>
+      <pre class="anim-fade"><span class="comment">-- Force every human through the IdP so Conditional Access can evaluate device posture</span>
+<span class="keyword">CREATE</span> AUTHENTICATION <span class="keyword">POLICY</span> sso_only_humans
+  AUTHENTICATION_METHODS = (<span class="string">'SAML'</span>)
+  MFA_AUTHENTICATION_METHODS = (<span class="string">'SAML'</span>)
+  CLIENT_TYPES = (<span class="string">'SNOWFLAKE_UI'</span>, <span class="string">'DRIVERS'</span>);
+
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> sso_only_humans
+  FOR <span class="keyword">ALL</span> PERSON USERS;
+
+<span class="comment">-- Keep a non-restrictive policy on a break-glass admin to avoid lockout</span>
+<span class="keyword">ALTER</span> USER breakglass_admin <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> admin_fallback_policy;</pre>
+      <div class="context-box anim-fade">
+        <p>Policy precedence runs <strong>network &rarr; authentication &rarr; password &rarr; session</strong>. A network policy match short-circuits evaluation before the authentication policy is even read, which is why Layer 2 is the cheapest broad control you own.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="layer-2-network">
+      <h2>Layer 2 &mdash; Network: The Control Most Accounts Have Built but Not Turned On</h2>
+      <p style="margin-bottom: 1.5rem;">Straight from the docs: "By default, Snowflake allows users to connect to the service and internal stage from <strong>any computer or device</strong>." A network policy narrows that to your corporate egress &mdash; VPN, SASE or proxy ranges &mdash; which alone removes the coffee-shop and cellular-data scenarios.</p>
+      <pre class="anim-fade"><span class="comment">-- Network rules group the identifiers; the policy groups the rules</span>
+<span class="keyword">CREATE</span> NETWORK RULE corp_egress_rule
+  MODE = INGRESS
+  <span class="keyword">TYPE</span> = IPV4
+  VALUE_LIST = (<span class="string">'203.0.113.0/24'</span>, <span class="string">'198.51.100.0/24'</span>);
+
+<span class="keyword">CREATE</span> NETWORK <span class="keyword">POLICY</span> corp_only_policy
+  ALLOWED_NETWORK_RULE_LIST = (<span class="string">'corp_egress_rule'</span>);
+
+<span class="comment">-- A policy does NOTHING until it is activated. This line is the control.</span>
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> NETWORK_POLICY = corp_only_policy;</pre>
+      <div class="warning-box anim-fade">
+        <p><strong>The single most common failure:</strong> "A network policy <strong>doesn't restrict network traffic until it is activated.</strong>" Creating the policy object changes nothing. Teams routinely build a policy, see it in <code>SHOW NETWORK POLICIES</code>, and believe they are covered. Confirm activation with <code>SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN ACCOUNT</code> &mdash; if the value is blank, the policy is inert.</p>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Use network rules, not IP lists</h4>
+          <p>New policies should use <code>ALLOWED_NETWORK_RULE_LIST</code>. <code>ALLOWED_IP_LIST</code> still works but Snowflake advises against mixing both in one policy.</p>
+        </div>
+        <div class="card">
+          <h4>Enumerate the full egress range</h4>
+          <p>SASE and proxy vendors publish many egress IPs per data centre. A policy containing one address will strand users the moment traffic shifts nodes.</p>
+        </div>
+        <div class="card">
+          <h4>Activate at three scopes</h4>
+          <p>Account, user, and security integration. Service accounts usually want a tighter, separate policy from humans.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>If you need the strongest version of this control, <strong>privatelink-only enforcement</strong> disables public access to your account endpoints entirely &mdash; an unknown caller gets <code>HTTP 404 account not found</code>. It requires Business Critical Edition or higher, and any SaaS tool that cannot use private connectivity will stop working, so inventory integrations first.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="layer-3-session">
+      <h2>Layer 3 &mdash; Session: Shorten the Window</h2>
+      <p style="margin-bottom: 1.5rem;">Even with everything above correct, a session already established on a device stays usable for a long time by default. The web UI and the drivers have separate timeouts, and the web UI default surprises most people.</p>
+      <div class="card anim-fade">
+        <div class="spec-row"><span class="spec-label">SESSION_UI_IDLE_TIMEOUT_MINS (Snowsight)</span><span class="spec-value">Default 1080 min &mdash; 18 hours</span></div>
+        <div class="spec-row"><span class="spec-label">SESSION_IDLE_TIMEOUT_MINS (clients, programmatic)</span><span class="spec-value">Default 240 min &mdash; 4 hours</span></div>
+        <div class="spec-row"><span class="spec-label">Permitted range, both</span><span class="spec-value">5 to 1440 minutes</span></div>
+        <div class="spec-row"><span class="spec-label">Also available</span><span class="spec-value">SESSION_MAX_LIFESPAN_MINS, SESSION_UI_MAX_LIFESPAN_MINS</span></div>
+      </div>
+      <p style="margin: 1.5rem 0;">An 18-hour idle window means a browser tab opened once in the morning is still live that evening, wherever the device has travelled. Max-lifespan caps force a genuine re-authentication regardless of activity, which re-runs your IdP device check.</p>
+      <pre class="anim-fade"><span class="comment">-- Snowsight default idle timeout is 1080 minutes (18 hours)</span>
+<span class="keyword">CREATE</span> SESSION <span class="keyword">POLICY</span> short_idle_policy
+  SESSION_UI_IDLE_TIMEOUT_MINS = <span class="number">30</span>
+  SESSION_IDLE_TIMEOUT_MINS = <span class="number">60</span>
+  SESSION_UI_MAX_LIFESPAN_MINS = <span class="number">480</span>;
+
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> SESSION <span class="keyword">POLICY</span> short_idle_policy;</pre>
+    </section>
+
+    <section class="slide" id="layer-4-data-limits">
+      <h2>Layer 4 &mdash; Limit What Is Downloadable at All</h2>
+      <p style="margin-bottom: 1.5rem;">If a session is legitimate, the remaining question is what lands in the result set. Snowflake's five data protection policy types shape query output at run time, independently of role grants. All require Enterprise Edition or higher.</p>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Masking policy</h4>
+          <p>Column-level. Returns a masked value at query time, so the export contains the mask, not the secret.</p>
+        </div>
+        <div class="card">
+          <h4>Row access policy</h4>
+          <p>Row-level. Restricts which rows are visible for SELECT, UPDATE, DELETE and MERGE.</p>
+        </div>
+        <div class="card">
+          <h4>Projection policy</h4>
+          <p>The most underused one here: a column can be filtered on but <em>cannot be projected into output</em>. Directly blocks "SELECT it and export it".</p>
+        </div>
+        <div class="card">
+          <h4>Aggregation policy</h4>
+          <p>Forces minimum group sizes, so no individual row can be isolated out of a small group.</p>
+        </div>
+        <div class="card">
+          <h4>Join policy</h4>
+          <p>Controls how datasets may be combined, limiting re-identification by correlation.</p>
+        </div>
+        <div class="card">
+          <h4>Apply via tags</h4>
+          <p>Attach policies to a governance tag rather than each column, so new sensitive columns inherit protection automatically.</p>
+        </div>
+      </div>
+      <pre class="anim-fade"><span class="comment">-- Projection policy: column is queryable for filters but cannot be SELECTed out</span>
+<span class="keyword">CREATE</span> PROJECTION <span class="keyword">POLICY</span> no_export_ssn
+  <span class="keyword">AS</span> () <span class="keyword">RETURNS</span> PROJECTION_CONSTRAINT -&gt;
+  <span class="keyword">CASE</span>
+    <span class="keyword">WHEN</span> <span class="function">CURRENT_ROLE</span>() = <span class="string">'FRAUD_ANALYST'</span> <span class="keyword">THEN</span> <span class="function">PROJECTION_CONSTRAINT</span>(ALLOW =&gt; TRUE)
+    <span class="keyword">ELSE</span> <span class="function">PROJECTION_CONSTRAINT</span>(ALLOW =&gt; FALSE)
+  <span class="keyword">END</span>;
+
+<span class="keyword">ALTER</span> <span class="keyword">TABLE</span> customers MODIFY COLUMN ssn
+  <span class="keyword">SET</span> PROJECTION <span class="keyword">POLICY</span> no_export_ssn;</pre>
+      <div class="highlight-box anim-fade">
+        <p><strong>Why this layer matters for the mobile question:</strong> it is the only layer that still helps when access is entirely legitimate. A managed laptop on the corporate network downloading a masked column is a non-event.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="layer-5-egress-params">
+      <h2>Layer 5 &mdash; Close the Bulk Export Paths</h2>
+      <p style="margin-bottom: 1.5rem;">The browser download button moves a result grid. <code>COPY INTO &lt;location&gt;</code> moves a table. It can unload to an internal stage, which is then pulled to local disk with <code>GET</code>, or to an external bucket. These parameters govern that path and are all off by default.</p>
+      <pre class="anim-fade"><span class="comment">-- Block COPY INTO -&gt; internal stage -&gt; GET, and inline presigned-URL unloads</span>
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> PREVENT_UNLOAD_TO_INTERNAL_STAGES = TRUE;
+<span class="keyword">ALTER</span> USER analyst_user <span class="keyword">SET</span> PREVENT_UNLOAD_TO_INLINE_URL = TRUE;
+
+<span class="comment">-- Force unloads through governed storage integrations only</span>
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_CREATION = TRUE;
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_OPERATION = TRUE;
+
+<span class="comment">-- Apply network rules to internal stage traffic too</span>
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> ENFORCE_NETWORK_RULES_FOR_INTERNAL_STAGES = TRUE;</pre>
+      <table class="evidence anim-fade">
+        <thead><tr><th>Parameter</th><th>Scope</th><th>What it closes</th></tr></thead>
+        <tbody>
+          <tr><td>PREVENT_UNLOAD_TO_INTERNAL_STAGES</td><td>Account and user (user wins)</td><td>Unload to internal stage, then <code>GET</code> to local disk</td></tr>
+          <tr><td>PREVENT_UNLOAD_TO_INLINE_URL</td><td>User</td><td>Unload addressed at an inline URL</td></tr>
+          <tr><td>REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_CREATION</td><td>Account</td><td>Ad-hoc stages pointing at unapproved buckets</td></tr>
+          <tr><td>REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_OPERATION</td><td>Account</td><td>Operating a stage with inline credentials</td></tr>
+          <tr><td>ENFORCE_NETWORK_RULES_FOR_INTERNAL_STAGES</td><td>Account</td><td>Stage traffic that ignores your network policy</td></tr>
+        </tbody>
+      </table>
+      <div class="warning-box anim-fade">
+        <p><strong>Both PREVENT_UNLOAD parameters are ACCOUNTADMIN-only to set,</strong> and as of the 2025_01 behaviour change <code>PREVENT_UNLOAD_TO_INTERNAL_STAGES</code> is settable at account <em>and</em> user level, with the user-level value taking precedence. Audit for user-level overrides before declaring the account covered.</p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Also inventory the OAuth and connector integrations that read your data &mdash; BI tools, automation platforms, and AI assistants. Each is an egress path reachable from a phone that no browser or driver control touches, because the data leaves through the integration rather than the user's device. Enumerate them, scope each to the narrowest role, and use <code>CLIENT_TYPES = ('DRIVERS')</code> on their service users so they cannot be replayed to sign in to the web UI.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="layer-6-audit">
+      <h2>Layer 6 &mdash; Prove It, Then Watch It</h2>
+      <p style="margin-bottom: 1.5rem;">Preventive controls need evidence that they are on and staying on. Two built-in surfaces cover most of it, with no pipeline to build.</p>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Trust Center</h4>
+          <p>Evaluates the account against scanner recommendations and raises findings. Includes secure-authentication readiness and whether MFA is enforced for all human users &mdash; the fastest way to find the accounts still holding a local password.</p>
+        </div>
+        <div class="card">
+          <h4>ACCESS_HISTORY</h4>
+          <p>Which query touched which table and column, and who ran it. The column-level detail is what lets you answer "was regulated data actually read", not just "was a query run".</p>
+        </div>
+        <div class="card">
+          <h4>AGGREGATE_ACCESS_HISTORY</h4>
+          <p>The same access picture aggregated into one-minute intervals for repeated queries, and it also covers short transactional queries that ACCESS_HISTORY omits. Enterprise Edition or higher, currently a preview feature.</p>
+        </div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>Ask for these four numbers at your next review:</strong> is a network policy activated at account scope; how many human users can still authenticate with a password; how many unload parameters are set; what is the Snowsight idle timeout. All four are one query each, and all four are commonly wrong.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="what-snowflake-cannot-do">
+      <h2>What Snowflake Cannot Do &mdash; Say This Out Loud</h2>
+      <p style="margin-bottom: 1.5rem;">Security teams trust a vendor more after hearing a clean list of limitations. These are real, and pretending otherwise gets found out during implementation.</p>
+      <table class="evidence anim-fade">
+        <thead><tr><th>Ask</th><th>Reality</th><th>Compensating control</th></tr></thead>
+        <tbody>
+          <tr><td>Disable the "Download Results" button</td><td>No such setting exists</td><td>Restrict access upstream; cap rows with <code>ROWS_PER_RESULTSET</code></td></tr>
+          <tr><td>Cap download row count or file size in the UI</td><td>Not offered as a download limit</td><td><code>ROWS_PER_RESULTSET</code> at account, user or session &mdash; note it limits <em>every</em> query the user runs, not just exports</td></tr>
+          <tr><td>Detect that a device is a phone</td><td>No device fingerprinting or posture check</td><td>IdP Conditional Access device compliance</td></tr>
+          <tr><td>Block screenshots or copy-paste</td><td>Out of scope for any database</td><td>MDM and endpoint DLP</td></tr>
+          <tr><td>Use CLIENT_TYPES as a security boundary</td><td>Explicitly documented as best-effort; does not cover REST APIs</td><td>Network policy plus IdP enforcement</td></tr>
+        </tbody>
+      </table>
+      <div class="warning-box anim-fade">
+        <p><strong>Sourcing note, stated plainly:</strong> the absence of a Snowsight download-limit setting and the <code>ROWS_PER_RESULTSET</code> workaround are documented in a Snowflake <em>Community Knowledge Base</em> article, not in the product documentation. Treat it as a supported workaround with a lower documentation guarantee than the product-doc controls elsewhere in this deck, and re-verify before you build a compliance narrative on it.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="hardening-sequence">
+      <h2>Recommended Sequence</h2>
+      <p style="margin-bottom: 1.5rem;">Ordered by control strength per unit of effort. Steps 1 and 2 deliver most of the outcome and neither requires an edition change or new spend.</p>
+      <div class="card anim-fade">
+        <div class="spec-row"><span class="spec-label">1. Activate a network policy at account scope</span><span class="spec-value">Removes off-network access outright</span></div>
+        <div class="spec-row"><span class="spec-label">2. Remove PASSWORD for human users; require IdP</span><span class="spec-value">Makes Conditional Access unbypassable</span></div>
+        <div class="spec-row"><span class="spec-label">3. Turn on device-compliance in the IdP</span><span class="spec-value">Blocks unmanaged phones at login</span></div>
+        <div class="spec-row"><span class="spec-label">4. Apply a session policy</span><span class="spec-value">Shrinks the 18-hour idle window</span></div>
+        <div class="spec-row"><span class="spec-label">5. Set the unload parameters</span><span class="spec-value">Closes bulk export to local disk</span></div>
+        <div class="spec-row"><span class="spec-label">6. Add projection policies on regulated columns</span><span class="spec-value">Makes legitimate exports harmless</span></div>
+        <div class="spec-row"><span class="spec-label">7. Baseline Trust Center and ACCESS_HISTORY</span><span class="spec-value">Proves posture and detects drift</span></div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>The one-sentence version:</strong> Snowflake will not stop a download, so stop the session &mdash; activate the network policy you probably already created, force every human through the IdP so device compliance can be enforced, then shorten sessions and close the unload paths behind it.</p>
+      </div>
+      <h3 style="margin-top: 2.5rem;">References</h3>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Product documentation</h4>
+          <p>
+            <a href="https://docs.snowflake.com/en/user-guide/network-policies">Controlling network traffic with network policies</a><br/>
+            <a href="https://docs.snowflake.com/en/user-guide/authentication-policies">Authentication policies</a><br/>
+            <a href="https://docs.snowflake.com/en/sql-reference/sql/create-session-policy">CREATE SESSION POLICY</a><br/>
+            <a href="https://docs.snowflake.com/en/user-guide/data-protection-policies-snowsight">Data protection policies</a><br/>
+            <a href="https://docs.snowflake.com/en/user-guide/projection-policies">Projection policies</a>
+          </p>
+        </div>
+        <div class="card">
+          <h4>Parameters and egress</h4>
+          <p>
+            <a href="https://docs.snowflake.com/en/sql-reference/sql/alter-account">ALTER ACCOUNT</a><br/>
+            <a href="https://docs.snowflake.com/en/sql-reference/sql/copy-into-location">COPY INTO &lt;location&gt;</a><br/>
+            <a href="https://docs.snowflake.com/en/release-notes/bcr-bundles/2025_01/bcr-1841">PREVENT_UNLOAD parameter behaviour change</a><br/>
+            <a href="https://docs.snowflake.com/en/user-guide/security-disable-public-access-privatelink">Enforcement of privatelink-only access</a>
+          </p>
+        </div>
+        <div class="card">
+          <h4>Audit and identity</h4>
+          <p>
+            <a href="https://docs.snowflake.com/en/user-guide/trust-center/overview">Trust Center</a><br/>
+            <a href="https://docs.snowflake.com/en/sql-reference/account-usage/aggregate_access_history">AGGREGATE_ACCESS_HISTORY</a><br/>
+            <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-device-compliance">Entra ID &mdash; require device compliance</a><br/>
+            <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-grant">Entra ID &mdash; grant controls</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
