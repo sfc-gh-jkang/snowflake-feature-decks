@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Freshness declaration. Uncomment for in-repo concept docs so
+       check_freshness.py can detect drift, dangling refs, and overdue review.
+       Omit entirely for standalone published decks (no code to drift against).
+  <meta name="doc-covers" content="src/events/**,src/state/reducer.ts">
+  <meta name="doc-symbols" content="EventRouter,dispatchEvent">
+  <meta name="doc-review-by" content="2027-01-01">
+  -->
+  <title>EXTERNAL + Free: What a Private App Listing Actually Requires</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Private Listings</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Contents</div>
+      <a href="#hero">Overview</a>
+      <a href="#what-external-free-means">What EXTERNAL + Free Means</a>
+      <a href="#what-snowflake-does-not-review">What Snowflake Does Not Review</a>
+      <a href="#what-snowflake-does-scan">What Snowflake Does Scan</a>
+      <a href="#the-scan-checklist">The Scan Checklist</a>
+      <a href="#the-auth-requirement">The Auth Requirement</a>
+      <a href="#external-access-and-oauth">External Access and OAuth</a>
+      <a href="#release-directives">Release Directives</a>
+      <a href="#cross-region-and-cost">Cross-Region and Cost</a>
+      <a href="#pre-flight-checklist">Pre-Flight Checklist</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>EXTERNAL + Free: What a Private App Listing Actually Requires</h1>
+      <p class="subtitle">A private listing of a Native App has no Snowflake approval gate. It has an automated security scan, and the scan is triggered by your <code>DISTRIBUTION</code> setting &mdash; not by the listing.</p>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">0</div>
+          <div class="stat-label">Snowflake approvals to schedule</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">~4 min</div>
+          <div class="stat-label">Observed scan, registered to APPROVED</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Release channels created by default</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">1-way</div>
+          <div class="stat-label">Share choice, once published</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="what-external-free-means">
+      <h2>What EXTERNAL + Free Means</h2>
+      <p style="margin-bottom: 1.5rem;">Two independent settings that get conflated. One controls who can install; the other controls who pays.</p>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>DISTRIBUTION = INTERNAL</h4>
+          <p>You can only create a private listing <strong>within the same organization</strong> where the application package was created. The automated security scan is not performed.</p>
+        </div>
+        <div class="card">
+          <h4>DISTRIBUTION = EXTERNAL</h4>
+          <p>You can create listings <strong>outside</strong> your organization: private listings to other orgs, public listings, and Marketplace listings. This is what turns the scan on.</p>
+        </div>
+        <div class="card">
+          <h4>Free</h4>
+          <p>A pricing choice, not a distribution choice. No provider profile and no Stripe account required. Free and EXTERNAL are orthogonal.</p>
+        </div>
+      </div>
+
+      <div class="highlight-box anim-fade">
+        <p><strong>The one sentence to remember:</strong> <code>DISTRIBUTION</code> decides whether Snowflake scans your code. The listing type decides whether Snowflake reviews your <em>listing</em>. A private listing skips the second entirely but not the first.</p>
+      </div>
+
+      <div class="card anim-fade">
+        <div class="spec-row"><span class="spec-label">Provider profile required</span><span class="spec-value">No, not for private listings</span></div>
+        <div class="spec-row"><span class="spec-label">Stripe required</span><span class="spec-value">No, free listing</span></div>
+        <div class="spec-row"><span class="spec-label">Legal terms</span><span class="spec-value">Customer-Controlled Data Sharing Functionality Terms</span></div>
+        <div class="spec-row"><span class="spec-label">Role to publish</span><span class="spec-value">ACCOUNTADMIN or OWNERSHIP on the listing</span></div>
+        <div class="spec-row"><span class="spec-label">Visible on Marketplace</span><span class="spec-value">Never &mdash; private listings do not appear there</span></div>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>If you accept the Customer-Controlled Data Sharing Functionality Terms, you do not need to accept the separate Snowflake Provider and Consumer Terms for a free private listing.
+        <a href="https://docs.snowflake.com/en/collaboration/collaboration-listings-legal">Legal requirements for listings</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="what-snowflake-does-not-review">
+      <h2>What Snowflake Does Not Review</h2>
+      <p style="margin-bottom: 1.5rem;">This is the single most expensive misread in the private-listing docs, and it costs teams weeks of imaginary lead time.</p>
+
+      <div class="warning-box anim-fade">
+        <p><strong>The trap:</strong> the &ldquo;Submit for Approval&rdquo; step on the create-and-publish page is <strong>Marketplace-only</strong>. The page documents two separate publish paths under one heading. Teams read the Marketplace path, assume it applies to them, and build a release plan around a Snowflake response date that does not exist.</p>
+      </div>
+
+      <table class="evidence anim-fade">
+        <thead><tr><th>Step</th><th>Private listing</th><th>Marketplace listing</th></tr></thead>
+        <tbody>
+          <tr><td>Provider profile</td><td>Not required</td><td>Required</td></tr>
+          <tr><td>Submit for approval</td><td>No such step</td><td>Required, every listing</td></tr>
+          <tr><td>Functional review by Marketplace Ops</td><td>No</td><td>Yes</td></tr>
+          <tr><td>Enforced app standards verified</td><td>No</td><td>Yes, at submission</td></tr>
+          <tr><td>Automated security scan</td><td><strong>Yes, if EXTERNAL</strong></td><td>Yes</td></tr>
+          <tr><td>Publish action</td><td>Configure, then Publish</td><td>Configure, submit, await approval, then Publish</td></tr>
+        </tbody>
+      </table>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>The enforced standards page</h4>
+          <p>The app quality standards &mdash; immediate utility, standalone, data-centric, transparent &mdash; are verified <em>when you submit a listing to Snowflake Marketplace</em>. They are not a gate on a private listing. Treat them as a design target if you might go public later, not a requirement today.</p>
+        </div>
+        <div class="card">
+          <h4>Shared responsibility still applies</h4>
+          <p>The provider is the seller of record, not Snowflake. Snowflake&rsquo;s scanning is explicitly <strong>not</strong> a substitute for your consumer&rsquo;s own due diligence. Expect their security team to ask for the privilege list regardless.</p>
+        </div>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>Sources: <a href="https://docs.snowflake.com/en/collaboration/provider-listings-creating-publishing">Create and publish a listing</a> &middot;
+        <a href="https://docs.snowflake.com/en/collaboration/guidelines-reqs-for-listing-apps">Guidelines and requirements for listing Apps</a> &middot;
+        <a href="https://docs.snowflake.com/en/developer-guide/native-apps/consumer-guide-evaluate">Evaluate a Native App before installing</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="what-snowflake-does-scan">
+      <h2>What Snowflake Does Scan</h2>
+      <p style="margin-bottom: 1.5rem;">The scan is real, automated, and entirely self-service. You start it, you watch it, and it does not wait on a human at Snowflake unless it fails.</p>
+
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step">
+          <div class="step-label">Step 1</div>
+          <div class="step-title">Set DISTRIBUTION = EXTERNAL</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">Step 2</div>
+          <div class="step-title">Register version</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active">
+          <div class="step-label">Step 3</div>
+          <div class="step-title">Add to ALPHA or DEFAULT channel</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">Step 4</div>
+          <div class="step-title">Poll review_status</div>
+        </div>
+      </div>
+
+<pre class="anim-fade"><span class="comment">-- Release channels are enabled by default on new packages,</span>
+<span class="comment">-- so ADD VERSION is rejected -- use REGISTER VERSION</span>
+<span class="keyword">ALTER</span> APPLICATION PACKAGE analytics_prod_pkg
+  REGISTER VERSION v1
+  <span class="keyword">USING</span> <span class="string">'@app_build_db.src.app_src'</span>;
+
+<span class="comment">-- Adding to ALPHA or DEFAULT starts the security scan.</span>
+<span class="comment">-- Adding only to QA does not.</span>
+<span class="keyword">ALTER</span> APPLICATION PACKAGE analytics_prod_pkg
+  MODIFY RELEASE CHANNEL <span class="keyword">DEFAULT</span> <span class="keyword">ADD</span> VERSION v1;</pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Release channels are enabled by default on new application packages.</strong> <code>ALTER APPLICATION PACKAGE ... ADD VERSION</code> is rejected with <em>&ldquo;Release channels enabled ... Use REGISTER/DEREGISTER instead of ADD/DROP version syntax&rdquo;</em>. Many older examples still show <code>ADD VERSION</code>.</p>
+      </div>
+
+      <p style="margin-bottom: 1.5rem;">The three default channels state the scan contract in their own descriptions:</p>
+
+      <div class="card anim-fade">
+        <div class="spec-row"><span class="spec-label">DEFAULT</span><span class="spec-value">All versions passed Snowflake security and functional review</span></div>
+        <div class="spec-row"><span class="spec-label">ALPHA</span><span class="spec-value">May contain versions where security review was not approved before release</span></div>
+        <div class="spec-row"><span class="spec-label">QA</span><span class="spec-value">May contain versions never reviewed by Snowflake. Internal testing only</span></div>
+      </div>
+
+<pre class="anim-fade"><span class="keyword">SHOW</span> VERSIONS <span class="keyword">IN</span> APPLICATION PACKAGE analytics_prod_pkg;
+
+<span class="comment">-- review_status: NOT_REVIEWED -&gt; IN_PROGRESS -&gt; APPROVED | REJECTED</span>
+<span class="keyword">SELECT</span> <span class="string">"version"</span>, <span class="string">"patch"</span>, <span class="string">"review_status"</span>, <span class="string">"release_channel_names"</span>
+<span class="keyword">FROM</span> <span class="keyword">TABLE</span>(<span class="function">RESULT_SCAN</span>(<span class="function">LAST_QUERY_ID</span>()));</pre>
+
+      <p style="margin-bottom: 1.5rem;">Observed on a demo account, 2026-08-03, on a minimal app with no third-party dependencies:</p>
+
+      <table class="evidence anim-fade">
+        <thead><tr><th>Package</th><th>DISTRIBUTION</th><th>Channel</th><th>review_status observed</th></tr></thead>
+        <tbody>
+          <tr><td>Dev package</td><td>INTERNAL</td><td>DEFAULT</td><td><code>NOT_REVIEWED</code> &mdash; never scanned</td></tr>
+          <tr><td>Prod package</td><td>EXTERNAL</td><td>DEFAULT</td><td><code>NOT_REVIEWED</code> &rarr; <code>IN_PROGRESS</code> &rarr; <code>APPROVED</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box anim-fade">
+        <p><strong>Turnaround:</strong> registered at 13:22, <code>APPROVED</code> by roughly 13:26 &mdash; about four minutes. That is a floor, not a promise: a trivial app with no dependencies gives the CVE scanner nothing to do. Budget more for a real app, but the point stands that this is minutes-to-hours self-service, not a multi-week review queue.</p>
+      </div>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>When the scan fails</h4>
+          <p><code>REJECTED</code> triggers a manual Snowflake review, and the rejection reason is readable on the application package. Only at this point is a human at Snowflake in your path.</p>
+        </div>
+        <div class="card">
+          <h4>Appeals</h4>
+          <p>Open a severity 4 support ticket. A CVE-based appeal needs why the CVE is not exploitable, a reachability analysis if available, and a plan for updating &mdash; or a detailed reason you cannot.</p>
+        </div>
+        <div class="card">
+          <h4>Every version, every patch</h4>
+          <p>A package already set to EXTERNAL scans each new version or patch immediately. Flipping DISTRIBUTION on an existing package scans the 10 most recent patches of every version. Build the scan into your release cadence.</p>
+        </div>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>The ongoing-monitoring and 30-business-day remediation window described in the scan documentation is written as applying to apps <em>&ldquo;approved and published on the Snowflake Marketplace.&rdquo;</em> Whether that same window attaches to a private-listing-only app is not stated on that page. Per-version and per-patch rescanning is documented and certain; the monitoring SLA is Marketplace-scoped language and is flagged here rather than asserted either way.</p>
+        <p>Source: <a href="https://docs.snowflake.com/en/developer-guide/native-apps/security-run-scan">Run the automated security scan</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="the-scan-checklist">
+      <h2>The Scan Checklist</h2>
+      <p style="margin-bottom: 1.5rem;">Code against this before you flip DISTRIBUTION, not after the scan rejects you.</p>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Code</h4>
+          <p>No code loaded or executed from outside the application package except Snowflake-provided libraries. All code human-readable &mdash; minified JavaScript needs a source map. No dependencies carrying critical or high CVEs.</p>
+        </div>
+        <div class="card">
+          <h4>Secrets and transport</h4>
+          <p>No plain-text customer secrets, stored or required. All Internet communication over HTTPS with a valid TLS certificate.</p>
+        </div>
+        <div class="card">
+          <h4>Disclosure in the listing</h4>
+          <p>All functionality and features. Every Internet endpoint and URL the app connects to. Every external function. Any consumer data logged, collected, or stored. Non-essential cookies prohibited; essential ones disclosed.</p>
+        </div>
+        <div class="card">
+          <h4>Privileges</h4>
+          <p>The manifest declares every privilege on every object and all API integrations. Request the minimum set that makes the app work &mdash; and expect the consumer to read the list.</p>
+        </div>
+        <div class="card">
+          <h4>No harm</h4>
+          <p>No data leakage or loss, no restricting consumer access to their own data unless that is the point of the app, no excessive resource consumption, no arbitrary code injection or execution.</p>
+        </div>
+        <div class="card">
+          <h4>Behaves as advertised</h4>
+          <p>The app should do what the listing says, and installation and setup instructions belong in the listing.</p>
+        </div>
+      </div>
+
+      <div class="highlight-box anim-fade">
+        <p><strong>The documented best practice that most directly protects a release date:</strong> run two application packages. A development package on <code>INTERNAL</code> so iteration never triggers a scan, and a production package on <code>EXTERNAL</code> that only receives versions you have already reviewed.</p>
+      </div>
+
+<pre class="anim-fade"><span class="comment">-- Development package: iterate freely, never scanned</span>
+<span class="keyword">CREATE</span> APPLICATION PACKAGE analytics_dev_pkg
+  DISTRIBUTION = INTERNAL;
+
+<span class="comment">-- Production package: this is the one Snowflake scans</span>
+<span class="keyword">CREATE</span> APPLICATION PACKAGE analytics_prod_pkg
+  DISTRIBUTION = EXTERNAL;</pre>
+
+      <p style="margin-bottom: 1.5rem;">App specifications require <code>manifest_version: 2</code>, which also enables automated granting of privileges:</p>
+
+<pre class="anim-fade"><span class="function">manifest_version</span>: <span class="number">2</span>
+<span class="function">version</span>:
+  <span class="function">name</span>: v1
+<span class="function">artifacts</span>:
+  <span class="function">readme</span>: readme.md
+  <span class="function">setup_script</span>: setup.sql
+<span class="function">privileges</span>:
+  - CREATE EXTERNAL ACCESS <span class="function">INTEGRATION</span>:
+      <span class="function">description</span>: <span class="string">"Allows the app to create an EAI."</span></pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Indentation trap, verified by execution:</strong> the <code>privileges</code> example as indented in the docs puts <code>description</code> at the same level as the privilege name. YAML parses that as one map with <em>two</em> keys, and Snowflake rejects it:</p>
+        <p><em>Error parsing 'manifest.yml' ... Manifest field 'privileges' may only specify a single attribute per item.</em></p>
+        <p><code>description</code> must be nested one level deeper, under the privilege key. This is what the rejected form looks like:</p>
+      </div>
+
+<pre class="anim-fade"><span class="function">privileges</span>:
+  - CREATE EXTERNAL ACCESS <span class="function">INTEGRATION</span>:
+    <span class="function">description</span>: <span class="string">"Allows the app to create an EAI."</span></pre>
+
+      <div class="context-box anim-fade">
+        <p>Setting <code>manifest_version: 2</code> means consumers agree at install time that the app may be granted the declared privileges during upgrades without additional consent. Consumers can constrain this with feature policies that limit which objects an app may create.</p>
+        <p>Sources: <a href="https://docs.snowflake.com/en/developer-guide/native-apps/security-app-requirements">Security requirements and best practices</a> &middot;
+        <a href="https://docs.snowflake.com/en/developer-guide/native-apps/manifest-overview">Create the manifest file</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="the-auth-requirement">
+      <h2>The Auth Requirement</h2>
+      <p style="margin-bottom: 1.5rem;">The requirement most likely to force an architecture change rather than a checklist fix. If your app has a UI, read this first.</p>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Snowflake authentication must come first.</strong> All connections to an app &mdash; including web-based user interfaces and APIs &mdash; must first authenticate using a Snowflake-provided method. Any app-specific authentication must be presented to users <em>only after</em> Snowflake authentication has succeeded. Apps must not create public endpoints reachable without successful Snowflake authentication.</p>
+      </div>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Why this breaks designs</h4>
+          <p>A team porting an existing SaaS product often assumes their own login page fronts the app. Inside a Native App it cannot. Your login screen can exist, but only behind Snowflake auth &mdash; never in front of it.</p>
+        </div>
+        <div class="card">
+          <h4>What is allowed</h4>
+          <p>Asking a consumer to create a service user in their account purely to reach an <em>external</em> service is acceptable, using a Programmatic Access Token, OAuth, or key pair, granted minimum permissions.</p>
+        </div>
+        <div class="card">
+          <h4>What is never allowed</h4>
+          <p>Requiring the consumer to type their Snowflake username and password into your app, or to generate a keypair and hand you the private key.</p>
+        </div>
+      </div>
+
+      <div class="highlight-box anim-fade">
+        <p><strong>Check this before you write the scan checklist off as paperwork.</strong> Every other item on the previous slide is a fix. This one can be a redesign, and it is cheapest to discover now.</p>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>Source: <a href="https://docs.snowflake.com/en/developer-guide/native-apps/security-app-requirements">Security requirements and best practices for a Snowflake Native App</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="external-access-and-oauth">
+      <h2>External Access and OAuth</h2>
+      <p style="margin-bottom: 1.5rem;">Outbound calls are requested through app specifications, approved per-consumer, and can be partially granted. The app has to cope with that.</p>
+
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step">
+          <div class="step-label">Step 1</div>
+          <div class="step-title">Declare privilege in manifest</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">Step 2</div>
+          <div class="step-title">Setup script creates rule, EAI, spec</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active">
+          <div class="step-label">Step 3</div>
+          <div class="step-title">Consumer approves host ports</div>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step">
+          <div class="step-label">Step 4</div>
+          <div class="step-title">App verifies, then calls</div>
+        </div>
+      </div>
+
+<pre class="anim-fade"><span class="comment">-- In the setup script. Runs in the CONSUMER account at install time.</span>
+<span class="keyword">CREATE</span> <span class="keyword">OR</span> <span class="keyword">REPLACE</span> NETWORK RULE setup.partner_api_rule
+  <span class="keyword">TYPE</span> = HOST_PORT
+  VALUE_LIST = (<span class="string">'api.example.com'</span>)
+  MODE = EGRESS;
+
+<span class="keyword">CREATE</span> <span class="keyword">OR</span> <span class="keyword">REPLACE</span> EXTERNAL <span class="keyword">ACCESS</span> INTEGRATION partner_api_eai
+  ALLOWED_NETWORK_RULES = (setup.partner_api_rule)
+  ENABLED = TRUE;
+
+<span class="comment">-- HOST_PORTS must match the network rule VALUE_LIST.</span>
+<span class="comment">-- The EAI exists but is NOT usable until the consumer approves this.</span>
+<span class="keyword">ALTER</span> APPLICATION <span class="keyword">SET</span> SPECIFICATION partner_api_spec
+  <span class="keyword">TYPE</span> = EXTERNAL_ACCESS
+  LABEL = <span class="string">'Connection to the partner API'</span>
+  DESCRIPTION = <span class="string">'Reads reference metadata from an API outside Snowflake'</span>
+  HOST_PORTS = (<span class="string">'api.example.com'</span>);</pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Partial approval is the case to design for.</strong> An app may request access to several endpoints and the consumer might allow only one. The EAI is created in the consumer account but is <strong>not usable</strong> until the specification is approved, and the app must confirm approval before making API calls. An app that assumes all-or-nothing will fail in production at a customer who approved three of four hosts.</p>
+      </div>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Ports must match</h4>
+          <p>Endpoints and ports in the app specification must match the values in the network rule&rsquo;s <code>VALUE_LIST</code>. A mismatch is a silent misconfiguration until a call fails.</p>
+        </div>
+        <div class="card">
+          <h4>One spec covers all EAIs</h4>
+          <p>A single app specification applies to every EAI the app creates. Multiple specifications are supported but not required &mdash; split them when you want independently approvable groups of endpoints.</p>
+        </div>
+        <div class="card">
+          <h4>Disclose the endpoints</h4>
+          <p>Every Internet endpoint and URL the app connects to must be disclosed in the listing. The specification list and the listing disclosure need to agree.</p>
+        </div>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>Sources: <a href="https://docs.snowflake.com/en/developer-guide/native-apps/requesting-app-specs-eai">Request external access</a> &middot;
+        <a href="https://docs.snowflake.com/en/developer-guide/native-apps/requesting-example-oauth">OAuth example</a> &middot;
+        <a href="https://docs.snowflake.com/en/developer-guide/native-apps/ui-consumer-app-spec">How consumers approve specifications</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="release-directives">
+      <h2>Release Directives</h2>
+      <p style="margin-bottom: 1.5rem;">A listing cannot be published until a release directive exists. It is also the mechanism for piloting a version with a subset of customers.</p>
+
+<pre class="anim-fade"><span class="comment">-- Required before a listing can be published.</span>
+<span class="keyword">ALTER</span> APPLICATION PACKAGE analytics_prod_pkg
+  MODIFY RELEASE CHANNEL <span class="keyword">DEFAULT</span>
+  <span class="keyword">SET</span> <span class="keyword">DEFAULT</span> RELEASE DIRECTIVE VERSION = v1 PATCH = <span class="number">0</span>;
+
+<span class="comment">-- Pilot a version with named accounts. ACCOUNTS comes BEFORE VERSION.</span>
+<span class="keyword">ALTER</span> APPLICATION PACKAGE analytics_prod_pkg
+  <span class="keyword">SET</span> RELEASE DIRECTIVE pilot_customers
+  ACCOUNTS = (myorg.pilot_acct)
+  VERSION = v1 PATCH = <span class="number">0</span>;</pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Argument order is not interchangeable.</strong> For <code>SET RELEASE DIRECTIVE</code>, <code>ACCOUNTS</code> comes before <code>VERSION</code> and <code>PATCH</code>. Putting <code>VERSION</code> first fails with <em>syntax error ... unexpected 'VERSION'</em>. Some channel-oriented examples show the reverse order; the reference syntax page is authoritative.</p>
+      </div>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Default vs custom</h4>
+          <p>The default release directive sets what every consumer installs. A custom directive overrides it for named accounts, and a custom directive always takes precedence.</p>
+        </div>
+        <div class="card">
+          <h4>Piloting safely</h4>
+          <p>Point a custom directive at two friendly accounts, leave the default on the previous version, and promote only after they confirm. Use <code>FORCE</code> to atomically move accounts already assigned elsewhere.</p>
+        </div>
+        <div class="card">
+          <h4>Respecting maintenance windows</h4>
+          <p><code>UPGRADE_IN_MAINTENANCE_WINDOW = TRUE</code> defers upgrades to the consumer&rsquo;s window, and requires <code>UPGRADE_DEADLINE</code>. It cannot be combined with <code>UPGRADE_AFTER</code>.</p>
+        </div>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>Sources: <a href="https://docs.snowflake.com/en/sql-reference/sql/alter-application-package-release-directive">ALTER APPLICATION PACKAGE ... RELEASE DIRECTIVE</a> &middot;
+        <a href="https://docs.snowflake.com/en/developer-guide/native-apps/release-channels">Release channels</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="cross-region-and-cost">
+      <h2>Cross-Region and Cost</h2>
+      <p style="margin-bottom: 1.5rem;">Where a free listing stops being free &mdash; for you, not your consumer.</p>
+
+      <div class="warning-box anim-fade">
+        <p><strong>&ldquo;Free&rdquo; means free to the consumer.</strong> If any consumer sits in a different region or cloud than the account hosting your application package, Cross-Cloud Auto-Fulfillment replicates it &mdash; and the <strong>provider</strong> incurs the compute, storage, and egress cost of that replication. More consumer regions means higher cost, driven mostly by data transfer.</p>
+      </div>
+
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Fulfillment is demand-driven</h4>
+          <p>Private listings are auto-fulfilled <em>after</em> the specified consumers get the listing. You are not paying to pre-stage every region, only the ones with active consumers.</p>
+        </div>
+        <div class="card">
+          <h4>Costs land on a secure share area</h4>
+          <p>Snowflake creates one secure share area per region for the organization and attributes the cost there, so it will not show up under your normal warehouse attribution. Track it with <code>LISTING_AUTO_FULFILLMENT_USAGE_HISTORY</code> in <code>ORGANIZATION_USAGE</code>.</p>
+        </div>
+        <div class="card">
+          <h4>Egress Cost Optimization</h4>
+          <p>ECO can materially reduce the transfer component. Worth enabling before you scale to many consumer regions rather than after the first bill.</p>
+        </div>
+      </div>
+
+<pre class="anim-fade"><span class="comment">-- Without this, remote-region consumers stay pinned to an old version.</span>
+<span class="keyword">ALTER</span> APPLICATION PACKAGE analytics_prod_pkg
+  <span class="keyword">SET</span> LISTING_AUTO_REFRESH = TRUE;
+
+<span class="comment">-- On-demand push. Takes TWO arguments: type, then name.</span>
+<span class="keyword">SELECT</span> SYSTEM$<span class="function">TRIGGER_LISTING_REFRESH</span>(<span class="string">'LISTING'</span>, <span class="string">'MY_LISTING_GLOBAL_NAME'</span>);</pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>The silent version-drift bug:</strong> an application package attached to a listing does not automatically propagate new versions to remote regions. Without <code>LISTING_AUTO_REFRESH</code>, or an explicit <code>SYSTEM$TRIGGER_LISTING_REFRESH</code>, consumers in other regions stay on an older version while your home region looks correct. Track refreshes with <code>LISTING_REFRESH_HISTORY</code>.</p>
+      </div>
+
+      <div class="warning-box anim-fade">
+        <p><strong>One-way door:</strong> after you publish a private listing, you cannot change the share associated with it. Decide the data product before you publish, not after.</p>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p>Sources: <a href="https://docs.snowflake.com/en/collaboration/provider-listings-auto-fulfillment">Cross-Cloud Auto-Fulfillment</a> &middot;
+        <a href="https://docs.snowflake.com/en/collaboration/provider-understand-cost-auto-fulfillment">Auto-fulfillment costs</a> &middot;
+        <a href="https://docs.snowflake.com/en/sql-reference/functions/system_trigger_listing_refresh">SYSTEM$TRIGGER_LISTING_REFRESH</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="pre-flight-checklist">
+      <h2>Pre-Flight Checklist</h2>
+      <p style="margin-bottom: 1.5rem;">What to settle before you commit to a release date.</p>
+
+      <table class="evidence anim-fade">
+        <thead><tr><th>Item</th><th>Why it gates you</th></tr></thead>
+        <tbody>
+          <tr><td>Consumer org topology</td><td>Same org means <code>INTERNAL</code> and no scan at all. Different org means <code>EXTERNAL</code> and everything on this deck applies.</td></tr>
+          <tr><td>Consumer regions and clouds</td><td>Determines whether auto-fulfillment, refresh configuration, and egress cost enter the picture.</td></tr>
+          <tr><td>Scan run early on a throwaway version</td><td>Turns scan findings into a development task instead of a release-week emergency.</td></tr>
+          <tr><td>Two-package split in place</td><td>Keeps iteration off the scan path.</td></tr>
+          <tr><td>Snowflake-auth-first confirmed for any UI</td><td>The one requirement that can force a redesign rather than a fix.</td></tr>
+          <tr><td>App specification list finalized</td><td>Must match the network rules and the listing disclosure, and must tolerate partial approval.</td></tr>
+          <tr><td>Release directive set</td><td>Hard blocker: no directive, no publish.</td></tr>
+          <tr><td>Clean cross-org test install</td><td>Where privilege and reference errors actually surface.</td></tr>
+          <tr><td>Legal terms accepted</td><td>Customer-Controlled Data Sharing Functionality Terms, by ACCOUNTADMIN.</td></tr>
+          <tr><td>Patch cadence planned</td><td>Every version and patch is rescanned. The scan is recurring, not one-time.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box anim-fade">
+        <p><strong>Net:</strong> for an EXTERNAL free private listing there is no Snowflake approval to wait on. The work is a self-service security scan you can start today, an auth model you should validate before writing more code, and a cross-region cost decision that belongs to you rather than your consumer.</p>
+      </div>
+
+      <div class="context-box anim-fade">
+        <p><strong>How the SQL in this deck was verified.</strong> Executed on a Snowflake demo account on 2026-08-03: package creation at both <code>DISTRIBUTION</code> settings, <code>REGISTER VERSION</code>, adding a version to the <code>DEFAULT</code> release channel, <code>SHOW VERSIONS</code> and the observed <code>review_status</code> transitions, <code>SET DEFAULT RELEASE DIRECTIVE</code>, and <code>SET LISTING_AUTO_REFRESH</code>. The manifest <code>privileges</code> indentation error and the <code>ADD VERSION</code> rejection were both produced by real execution, not inferred.</p>
+        <p>Compile-validated only, because they require a published listing or real consumer accounts: <code>SYSTEM$TRIGGER_LISTING_REFRESH</code>, the custom release directive with <code>ACCOUNTS</code>, and the channel-scoped <code>MODIFY RELEASE DIRECTIVE ... ADD ACCOUNTS</code> form. Two of the snippets in this deck were corrected by that process: the refresh function&rsquo;s argument count and the release directive&rsquo;s argument order. All test objects were dropped afterward.</p>
+        <p>No listing was created or published during verification.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

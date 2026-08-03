@@ -20,6 +20,7 @@ so these sit alongside that library.
 | Storage Lifecycle Policies: Archive Before You Pay | SEs, Data Engineers, Compliance | Presentation + speaker notes | GA 2025-11-07 (COLD: AWS + GCP only) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/storage-lifecycle-policies/presentations/storage-lifecycle-policies.html) |
 | Secretless CI/CD: Deploying to Snowflake from GitHub Actions | SEs, Platform Engineers | Presentation + speaker notes | GA (OIDC needs CLI 3.11+) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/github-actions-oidc-cicd/presentations/github-actions-oidc-cicd.html) |
 | Preventing Data Download to Unmanaged Devices | SEs, Security Teams, IAM Owners | Presentation + speaker notes | GA (AGGREGATE_ACCESS_HISTORY preview; 1 claim KB-sourced) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/preventing-data-egress-unmanaged-devices/presentations/preventing-data-egress-unmanaged-devices.html) |
+| EXTERNAL + Free: What a Private App Listing Actually Requires | SEs, ISV/Partner Product Teams | Presentation + speaker notes | GA (2 doc snippets corrected by execution) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/external-free-private-listings/presentations/external-free-private-listings.html) |
 
 ## Claim accuracy
 
