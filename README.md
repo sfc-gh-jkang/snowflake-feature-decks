@@ -4,6 +4,10 @@ Self-contained HTML decks explaining Snowflake features and patterns. Each deck 
 a single file with inline CSS and JS — no build step, no dependencies — served
 directly from GitHub Pages.
 
+**[Source on GitHub](https://github.com/sfc-gh-jkang/snowflake-feature-decks)** —
+every deck links back here, and this page links back to the repo. Corrections to
+factual claims are welcome; see [Owner](#owner).
+
 Deck links below are absolute GitHub Pages URLs. Relative links would render the
 HTML source instead of the page when this README is viewed on github.com.
 
@@ -76,6 +80,8 @@ without them exits 2 with a pointer rather than a traceback.
 | Owner | John Kang |
 | Email | john.kang@snowflake.com |
 | GitHub | [@sfc-gh-jkang](https://github.com/sfc-gh-jkang) |
+| Repository | [sfc-gh-jkang/snowflake-feature-decks](https://github.com/sfc-gh-jkang/snowflake-feature-decks) |
+| Issues | [Open an issue](https://github.com/sfc-gh-jkang/snowflake-feature-decks/issues) |
 | Access requests | Email the owner, or open an issue |
 | License | Apache-2.0 |
 
