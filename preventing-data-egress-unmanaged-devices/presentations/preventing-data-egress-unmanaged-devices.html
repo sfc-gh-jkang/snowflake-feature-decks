@@ -572,6 +572,9 @@
         <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Layers that actually move the needle</div></div>
         <div class="stat-card"><div class="stat-value">0</div><div class="stat-label">Settings that disable "Download Results"</div></div>
       </div>
+      <div class="context-box anim-fade" style="margin-top: 2rem;">
+        <p><strong>Every SQL statement in this deck was executed against a live Snowflake account</strong> (Enterprise Edition, AWS us&#8209;east&#8209;1) on 2026-08-03. Object-creation and policy-behaviour statements were run and their effects verified; the two account-wide activation statements (<code>ALTER ACCOUNT SET NETWORK_POLICY</code> and <code>SET AUTHENTICATION POLICY &hellip; FOR ALL PERSON USERS</code>) were compile-validated only, because executing them with the example values in this deck would lock you out of your own account. Treat those two lines as the last step of a planned change, not something to paste into a worksheet.</p>
+      </div>
     </section>
 
     <section class="slide" id="the-real-question">
@@ -644,16 +647,22 @@
         <p><strong>The gap that quietly undoes all of it:</strong> any user who still holds a <em>local Snowflake password</em> can bypass the IdP entirely, and with it every Conditional Access rule you wrote. Federating the IdP is only half the job &mdash; you must also remove password as an allowed authentication method for human users.</p>
       </div>
       <pre class="anim-fade"><span class="comment">-- Force every human through the IdP so Conditional Access can evaluate device posture</span>
-<span class="keyword">CREATE</span> AUTHENTICATION <span class="keyword">POLICY</span> sso_only_humans
+<span class="keyword">CREATE</span> AUTHENTICATION <span class="keyword">POLICY</span> mydb.security.sso_only_humans
   AUTHENTICATION_METHODS = (<span class="string">'SAML'</span>)
-  MFA_AUTHENTICATION_METHODS = (<span class="string">'SAML'</span>)
-  CLIENT_TYPES = (<span class="string">'SNOWFLAKE_UI'</span>, <span class="string">'DRIVERS'</span>);
+  CLIENT_TYPES = (<span class="string">'SNOWFLAKE_UI'</span>, <span class="string">'DRIVERS'</span>)
+  MFA_ENROLLMENT = <span class="string">'OPTIONAL'</span>
+  <span class="keyword">COMMENT</span> = <span class="string">'Humans authenticate via IdP only; device posture enforced upstream'</span>;
 
-<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> sso_only_humans
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> mydb.security.sso_only_humans
   FOR <span class="keyword">ALL</span> PERSON USERS;
 
 <span class="comment">-- Keep a non-restrictive policy on a break-glass admin to avoid lockout</span>
-<span class="keyword">ALTER</span> USER breakglass_admin <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> admin_fallback_policy;</pre>
+<span class="keyword">ALTER</span> USER breakglass_admin
+  <span class="keyword">SET</span> AUTHENTICATION <span class="keyword">POLICY</span> mydb.security.admin_fallback_policy;</pre>
+
+      <div class="warning-box anim-fade">
+        <p><strong>Verified hard error &mdash; and it bites the "just block the UI" instinct directly:</strong> if you set <code>MFA_ENROLLMENT = 'REQUIRED'</code> and leave <code>SNOWFLAKE_UI</code> out of <code>CLIENT_TYPES</code>, the statement is rejected: <em>"If MFA_ENROLLMENT = 'REQUIRED', CLIENT_TYPES must include SNOWFLAKE_UI to allow for enrollment."</em> Excluding the web UI therefore forces <code>MFA_ENROLLMENT = 'OPTIONAL'</code>, which weakens Snowflake-native MFA enrollment. When the IdP owns MFA this is the correct trade, but make it deliberately rather than discovering it in an error message.</p>
+      </div>
       <div class="context-box anim-fade">
         <p>Policy precedence runs <strong>network &rarr; authentication &rarr; password &rarr; session</strong>. A network policy match short-circuits evaluation before the authentication policy is even read, which is why Layer 2 is the cheapest broad control you own.</p>
       </div>
@@ -662,17 +671,20 @@
     <section class="slide" id="layer-2-network">
       <h2>Layer 2 &mdash; Network: The Control Most Accounts Have Built but Not Turned On</h2>
       <p style="margin-bottom: 1.5rem;">Straight from the docs: "By default, Snowflake allows users to connect to the service and internal stage from <strong>any computer or device</strong>." A network policy narrows that to your corporate egress &mdash; VPN, SASE or proxy ranges &mdash; which alone removes the coffee-shop and cellular-data scenarios.</p>
-      <pre class="anim-fade"><span class="comment">-- Network rules group the identifiers; the policy groups the rules</span>
-<span class="keyword">CREATE</span> NETWORK RULE corp_egress_rule
+      <pre class="anim-fade"><span class="comment">-- Network rules live in a schema; the network policy itself is account-level</span>
+<span class="keyword">CREATE</span> NETWORK RULE mydb.security.corp_egress_rule
   MODE = INGRESS
   <span class="keyword">TYPE</span> = IPV4
   VALUE_LIST = (<span class="string">'203.0.113.0/24'</span>, <span class="string">'198.51.100.0/24'</span>);
 
 <span class="keyword">CREATE</span> NETWORK <span class="keyword">POLICY</span> corp_only_policy
-  ALLOWED_NETWORK_RULE_LIST = (<span class="string">'corp_egress_rule'</span>);
+  ALLOWED_NETWORK_RULE_LIST = (<span class="string">'mydb.security.corp_egress_rule'</span>);
 
-<span class="comment">-- A policy does NOTHING until it is activated. This line is the control.</span>
-<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> NETWORK_POLICY = corp_only_policy;</pre>
+<span class="comment">-- A policy does NOTHING until it is activated. This line is the actual control.</span>
+<span class="keyword">ALTER</span> ACCOUNT <span class="keyword">SET</span> NETWORK_POLICY = corp_only_policy;
+
+<span class="comment">-- Verify. A blank value means no policy is active.</span>
+<span class="keyword">SHOW</span> PARAMETERS <span class="keyword">LIKE</span> <span class="string">'NETWORK_POLICY'</span> <span class="keyword">IN</span> ACCOUNT;</pre>
       <div class="warning-box anim-fade">
         <p><strong>The single most common failure:</strong> "A network policy <strong>doesn't restrict network traffic until it is activated.</strong>" Creating the policy object changes nothing. Teams routinely build a policy, see it in <code>SHOW NETWORK POLICIES</code>, and believe they are covered. Confirm activation with <code>SHOW PARAMETERS LIKE 'NETWORK_POLICY' IN ACCOUNT</code> &mdash; if the value is blank, the policy is inert.</p>
       </div>
@@ -753,6 +765,9 @@
 
 <span class="keyword">ALTER</span> <span class="keyword">TABLE</span> customers MODIFY COLUMN ssn
   <span class="keyword">SET</span> PROJECTION <span class="keyword">POLICY</span> no_export_ssn;</pre>
+      <div class="warning-box anim-fade">
+        <p><strong>Operational caveat, verified:</strong> a projection policy does <em>not</em> silently omit the column. Both <code>SELECT ssn</code> and bare <code>SELECT *</code> fail outright with <em>"The following columns are restricted by a Projection Policy."</em> Any existing query, view or BI extract using <code>SELECT *</code> against the table will break the moment you apply the policy. Inventory <code>SELECT *</code> usage first, and expect to pin explicit column lists.</p>
+      </div>
       <div class="highlight-box anim-fade">
         <p><strong>Why this layer matters for the mobile question:</strong> it is the only layer that still helps when access is entirely legitimate. A managed laptop on the corporate network downloading a masked column is a non-event.</p>
       </div>

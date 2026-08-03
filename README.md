@@ -16,6 +16,7 @@ so these sit alongside that library.
 | Dynamic Tables: Why Your Refresh Went Full | SEs, Analytics Engineers | Presentation + speaker notes | GA (ADAPTIVE GA 2026-07-30) | [View](dynamic-tables-refresh-modes/presentations/dynamic-tables-refresh-modes.html) |
 | Storage Lifecycle Policies: Archive Before You Pay | SEs, Data Engineers, Compliance | Presentation + speaker notes | GA 2025-11-07 (COLD: AWS + GCP only) | [View](storage-lifecycle-policies/presentations/storage-lifecycle-policies.html) |
 | Secretless CI/CD: Deploying to Snowflake from GitHub Actions | SEs, Platform Engineers | Presentation + speaker notes | GA (OIDC needs CLI 3.11+) | [View](github-actions-oidc-cicd/presentations/github-actions-oidc-cicd.html) |
+| Preventing Data Download to Unmanaged Devices | SEs, Security Teams, IAM Owners | Presentation + speaker notes | GA (AGGREGATE_ACCESS_HISTORY preview; 1 claim KB-sourced) | [View](preventing-data-egress-unmanaged-devices/presentations/preventing-data-egress-unmanaged-devices.html) |
 
 ## Claim accuracy
 
