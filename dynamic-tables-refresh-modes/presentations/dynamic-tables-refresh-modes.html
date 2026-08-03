@@ -51,7 +51,7 @@
       height: 100vh;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      padding: 2rem 1.25rem;
+      padding: 2rem 1.25rem 6rem;
       overflow-y: auto;
       z-index: 100;
     }
@@ -99,11 +99,18 @@
       background: var(--accent-dim);
     }
 
-    .sidebar .github-link {
+    .sidebar .sidebar-footer {
       position: absolute;
       bottom: 1.5rem;
       left: 1.25rem;
       right: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .sidebar .github-link {
+      display: block;
       padding: 0.5rem 0.75rem;
       background: var(--surface-alt);
       border: 1px solid var(--border);
@@ -111,11 +118,17 @@
       color: var(--text-muted);
       font-size: 0.75rem;
       text-align: center;
+      margin-bottom: 0;
     }
 
     .sidebar .github-link:hover {
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    .sidebar .home-link {
+      color: var(--text);
+      border-color: var(--accent-dim);
     }
 
     /* Main Content */
@@ -177,6 +190,20 @@
       max-width: 1200px;
       margin: 0 auto;
       border-bottom: 1px solid var(--border);
+    }
+
+    .hero .breadcrumb {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+
+    .hero .breadcrumb:hover {
+      color: var(--accent);
     }
 
     .hero h1 {
@@ -561,11 +588,15 @@
       <a href="#custom-incremental">Custom Incremental</a>
       <a href="#takeaways">Takeaways</a>
     </div>
-    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+    <div class="sidebar-footer">
+      <a class="github-link home-link" href="https://sfc-gh-jkang.github.io/snowflake-feature-decks/">&larr; All decks</a>
+      <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+    </div>
   </nav>
 
   <main class="main">
     <section class="slide hero" id="hero">
+      <a class="breadcrumb" href="https://sfc-gh-jkang.github.io/snowflake-feature-decks/">Snowflake Feature Decks &rsaquo;</a>
       <h1>Dynamic Tables: Why Your Refresh Went Full</h1>
       <p class="subtitle">Incremental refresh is not a setting you turn on &mdash; it is a property your query either has or loses. Here is how to tell which, and what it costs.</p>
       <div class="stat-grid">

@@ -44,6 +44,11 @@ sidebar tracks position; the progress bar at the top reflects scroll depth. They
 print to PDF cleanly (the sidebar is dropped and fade-in blocks are forced
 visible).
 
+Every deck links back to this catalog in two places — a breadcrumb above the title
+and an "All decks" button in the sidebar footer — so a deck shared as a bare URL
+is still a route into the rest of the library. CI enforces both links and requires
+them to point at the same place.
+
 Each deck ships with `*-speaker-notes.md` alongside it: talking points, key
 insight, anticipated questions, and doc references per section.
 

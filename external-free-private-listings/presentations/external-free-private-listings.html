@@ -58,7 +58,7 @@
       height: 100vh;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      padding: 2rem 1.25rem;
+      padding: 2rem 1.25rem 6rem;
       overflow-y: auto;
       z-index: 100;
     }
@@ -106,11 +106,18 @@
       background: var(--accent-dim);
     }
 
-    .sidebar .github-link {
+    .sidebar .sidebar-footer {
       position: absolute;
       bottom: 1.5rem;
       left: 1.25rem;
       right: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .sidebar .github-link {
+      display: block;
       padding: 0.5rem 0.75rem;
       background: var(--surface-alt);
       border: 1px solid var(--border);
@@ -118,11 +125,17 @@
       color: var(--text-muted);
       font-size: 0.75rem;
       text-align: center;
+      margin-bottom: 0;
     }
 
     .sidebar .github-link:hover {
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    .sidebar .home-link {
+      color: var(--text);
+      border-color: var(--accent-dim);
     }
 
     /* Main Content */
@@ -184,6 +197,20 @@
       max-width: 1200px;
       margin: 0 auto;
       border-bottom: 1px solid var(--border);
+    }
+
+    .hero .breadcrumb {
+      display: inline-block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      margin-bottom: 1.25rem;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+
+    .hero .breadcrumb:hover {
+      color: var(--accent);
     }
 
     .hero h1 {
@@ -558,11 +585,15 @@
       <a href="#cross-region-and-cost">Cross-Region and Cost</a>
       <a href="#pre-flight-checklist">Pre-Flight Checklist</a>
     </div>
-    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+    <div class="sidebar-footer">
+      <a class="github-link home-link" href="https://sfc-gh-jkang.github.io/snowflake-feature-decks/">&larr; All decks</a>
+      <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+    </div>
   </nav>
 
   <main class="main">
     <section class="slide hero" id="hero">
+      <a class="breadcrumb" href="https://sfc-gh-jkang.github.io/snowflake-feature-decks/">Snowflake Feature Decks &rsaquo;</a>
       <h1>EXTERNAL + Free: What a Private App Listing Actually Requires</h1>
       <p class="subtitle">A private listing of a Native App has no Snowflake approval gate. It has an automated security scan, and the scan is triggered by your <code>DISTRIBUTION</code> setting &mdash; not by the listing.</p>
       <div class="stat-grid">
