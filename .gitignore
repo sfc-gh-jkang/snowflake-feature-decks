@@ -1,0 +1,28 @@
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.key
+credentials.json
+connections.toml
+
+# Terraform state can embed real infra IDs and provider secrets
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

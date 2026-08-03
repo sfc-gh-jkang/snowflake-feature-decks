@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Tables, Fed Directly by Snowpipe Streaming</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Interactive Tables</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Concepts</div>
+      <a href="#hero">Overview</a>
+      <a href="#the-problem">The Problem</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#support-status">Support Status</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Implementation</div>
+      <a href="#creating-the-table">Creating the Table</a>
+      <a href="#the-streaming-producer">The Streaming Producer</a>
+      <a href="#warehouse-pairing">Warehouse Pairing</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Operations</div>
+      <a href="#cost-traps">Cost Traps</a>
+      <a href="#limits">Limits</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Production</div>
+      <a href="#verifying-your-own-claims">Verifying Your Claims</a>
+      <a href="#takeaways">Takeaways</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>Interactive Tables, Fed Directly by Snowpipe Streaming</h1>
+      <p class="subtitle">One table is both the streaming target and the sub-second serving layer &mdash; no landing table, no COPY INTO, no rollup hop.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">196 ms</div><div class="stat-label">p50 query latency, X-Small interactive WH &mdash; live-measured, 30d to 2026-07-31</div></div>
+        <div class="stat-card"><div class="stat-value">12.3 M</div><div class="stat-label">Queries served in that same 30-day window</div></div>
+        <div class="stat-card"><div class="stat-value">Zero</div><div class="stat-label">Landing tables or COPY INTO steps</div></div>
+        <div class="stat-card"><div class="stat-value">24 h</div><div class="stat-label">Minimum warehouse auto-suspend &mdash; the cost trap</div></div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Read this first:</strong> both halves are GA &mdash; interactive tables <a class="badge-blue" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-12-11-interactive-tables-ga">GA Dec 2025</a>, Snowpipe Streaming HPA <a class="badge-blue" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-09-23-snowpipe-streaming-high-performance-architecture">GA Sep 2025</a> &mdash; and the direct-streaming pattern is documented in an official Snowflake quickstart: <a class="badge-green" href="https://www.snowflake.com/en/developers/guides/interactive-tables-snowpipe-streaming-arcade-lab/">Real-Time Streaming with Snowpipe Streaming and Interactive Tables</a>. What it is <em>not</em> is described in the interactive-tables product guide, which never mentions streaming, channels, or pipes and presents <code>TARGET_LAG</code> auto-refresh as the way to populate the table. That split is why the pattern is easy to miss &mdash; see <a href="#support-status">Support Status</a>.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="the-problem">
+      <h2>The Problem</h2>
+      <p style="margin-bottom: 1.5rem;">Streaming freshness and sub-second serving pull in opposite directions once you add a hop between them.</p>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Every Hop Adds Lag</h4>
+          <p>Stream into a landing table, then refresh a rollup on a schedule. End-to-end freshness is now ingest latency <em>plus</em> refresh lag &mdash; and the refresh lag usually dominates.</p>
+        </div>
+        <div class="card">
+          <h4>TARGET_LAG Has a Floor</h4>
+          <p>Auto-refresh is the documented path for interactive tables, but the minimum <code>TARGET_LAG</code> is 60 seconds. For a live trading or ops dashboard, a one-minute floor is the whole problem.</p>
+        </div>
+        <div class="card">
+          <h4>Interactive Warehouses Are Walled</h4>
+          <p>An interactive warehouse cannot query standard tables at all. Any join has to be between interactive tables on the same warehouse, so a normalized model forces you back to a standard warehouse.</p>
+        </div>
+        <div class="card">
+          <h4>Two Objects, Two Truths</h4>
+          <p>A separate rollup means the serving object and the system of record can silently diverge &mdash; and the README will describe whichever one you meant, not the one being read.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>The pattern below collapses the hops: the streaming channel writes into the interactive table itself, so serving freshness equals ingest latency. The cost is that you take on the constraints of a table that rejects almost all DML.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="architecture">
+      <h2>Architecture</h2>
+      <p style="margin-bottom: 1.5rem;">Six stages, no intermediate table.</p>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">Step 1</div><div class="step-title">Producer opens channels</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 2</div><div class="step-title">HPA SDK appends rows</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">Step 3</div><div class="step-title">Auto-pipe TABLE-STREAMING</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">Step 4</div><div class="step-title">Interactive table</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 5</div><div class="step-title">Interactive warehouse</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 6</div><div class="step-title">Dashboard reads</div></div>
+      </div>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Why It Works</h4>
+          <p>Snowpipe Streaming HPA routes all ingestion through a <code>PIPE</code> object, and the pipe targets <em>a table</em>. Nothing in the HPA contract requires that table to be a standard one. Opening a channel against an interactive table causes Snowflake to auto-create the default pipe for it, exactly as it would for any other table.</p>
+        </div>
+        <div class="card">
+          <h4>What You Give Up</h4>
+          <p>Interactive tables reject ordinary DML, so you cannot seed or correct rows with <code>INSERT</code> or <code>DELETE</code>. Every write &mdash; including the initial baseline &mdash; has to travel the streaming path. Plan corrections as re-streamed snapshots.</p>
+        </div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>The design consequence:</strong> because an interactive warehouse can only join interactive tables, denormalize dimension attributes onto the streamed events. Serving queries then never need a join, and the aggregation happens at query time against a single clustered table.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="support-status">
+      <h2>Support Status</h2>
+      <p style="margin-bottom: 1.5rem;">Documented in a quickstart, absent from the product guide. Here is exactly where it is written down, and what was independently verified.</p>
+      <table class="evidence anim-fade">
+        <thead><tr><th>Evidence gate</th><th>Result</th><th>How it was checked</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Object is an interactive table</td>
+            <td><span class="badge-green">Verified</span></td>
+            <td>Appears in <code>SHOW INTERACTIVE TABLES</code> with <code>CLUSTER BY (EVENT_TS)</code>, and both <code>target_lag</code> and <code>refresh_warehouse</code> are null &mdash; so it is not auto-refresh.</td>
+          </tr>
+          <tr>
+            <td>Streaming pipe targets it</td>
+            <td><span class="badge-green">Verified</span></td>
+            <td>Snowflake-managed pipe <code>RAW_EVENTS-STREAMING</code>, <code>kind = STREAMING</code>, auto-created 0.2 s after the table.</td>
+          </tr>
+          <tr>
+            <td>Producer code drives that pipe</td>
+            <td><span class="badge-green">Verified</span></td>
+            <td>Producer sets <code>pipe_name = f"&#123;table&#125;-STREAMING"</code> and calls <code>open_channel()</code> / <code>append_row()</code> / <code>wait_for_flush()</code>.</td>
+          </tr>
+          <tr>
+            <td>Rows did not arrive via SQL</td>
+            <td><span class="badge-green">Verified</span></td>
+            <td><code>QUERY_HISTORY</code> shows no <code>INSERT</code>, <code>INSERT OVERWRITE</code>, or <code>COPY INTO</code> against the table, yet rows are present.</td>
+          </tr>
+          <tr>
+            <td>Serving is exercised live</td>
+            <td><span class="badge-green">Verified</span></td>
+            <td>12,346,326 <code>SELECT</code>s on the X-Small interactive warehouse, p50 196 ms / p95 609 ms, over the 30 days to 2026-07-31. Across all history on that warehouse (from 2026-05-13): 24,578,168 queries, p50 212 ms.</td>
+          </tr>
+          <tr>
+            <td>Ingest confirmed by telemetry</td>
+            <td><span class="badge-red">Not provable</span></td>
+            <td><code>SNOWPIPE_STREAMING_CHANNEL_HISTORY</code> and <code>PIPE_USAGE_HISTORY</code> are empty account-wide. Only classic-era streaming views exist.</td>
+          </tr>
+          <tr>
+            <td>In an official Snowflake quickstart</td>
+            <td><span class="badge-green">Yes</span></td>
+            <td><a href="https://www.snowflake.com/en/developers/guides/interactive-tables-snowpipe-streaming-arcade-lab/">Real-Time Streaming with Snowpipe Streaming and Interactive Tables</a> (updated 2026-07-14), with runnable code at <a href="https://github.com/Snowflake-Labs/Summit26-InteractiveLab">Snowflake-Labs/Summit26-InteractiveLab</a>. It states rows are "written directly into the Interactive Table without any intermediate landing table, staging area, or <code>COPY INTO</code> command."</td>
+          </tr>
+          <tr>
+            <td>In the product user guide</td>
+            <td><span class="badge-orange">No</span></td>
+            <td>The interactive-tables guide never mentions Snowpipe, streaming, or channels, and presents <code>TARGET_LAG</code> auto-refresh as the way to populate the table. This is the gap that makes the pattern easy to miss.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="card anim-fade">
+        <h4>Measurement Provenance</h4>
+        <div class="spec-row"><span class="spec-label">Source</span><span class="spec-value">SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY</span></div>
+        <div class="spec-row"><span class="spec-label">Measured on</span><span class="spec-value">2026-07-31</span></div>
+        <div class="spec-row"><span class="spec-label">Headline window</span><span class="spec-value">30 days to 2026-07-31</span></div>
+        <div class="spec-row"><span class="spec-label">Warehouse</span><span class="spec-value">Interactive, X-Small, single account</span></div>
+        <div class="spec-row"><span class="spec-label">Nature</span><span class="spec-value">Live-measured, not a published benchmark</span></div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>How to describe this accurately:</strong> say "documented in a Snowflake quickstart, not yet in the product guide" &mdash; not "undocumented." The quickstart is first-party and ships working code, so this is a supported pattern you can demo and recommend. Two caveats worth carrying: the quickstart is explicitly marked "provided as is, and is not maintained on an ongoing basis," and HPA ingest still cannot be confirmed from <code>ACCOUNT_USAGE</code> because the streaming channel views are empty. That is an observability gap, not a support gap.</p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Why the matrix is here at all: a Snowflake demo repo once shipped a README claiming an interactive table was "the system of record AND the hot serving layer" while every query actually read a plain view over a standard table. A reviewer caught it, not the author. Verifying against a live account is also how the gap above surfaced &mdash; and how the correction did, once the quickstart turned up. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/interactive">Product guide</a> <a class="badge-green" href="https://www.snowflake.com/en/developers/guides/interactive-tables-snowpipe-streaming-arcade-lab/">Quickstart</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="creating-the-table">
+      <h2>Creating the Table</h2>
+      <p style="margin-bottom: 1.5rem;">Two gotchas that cost the most time: the required clustering key, and the fact that you cannot convert an existing table.</p>
+      <pre class="anim-fade"><span class="comment">-- You cannot CREATE OR REPLACE across table types. Converting a standard table</span>
+<span class="comment">-- to an interactive one fails with "Object already exists as TABLE", so drop</span>
+<span class="comment">-- the auto-created streaming pipe and the table first.</span>
+<span class="keyword">DROP</span> <span class="keyword">PIPE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> analytics.live.<span class="string">"RAW_EVENTS-STREAMING"</span>;
+<span class="keyword">DROP</span> <span class="keyword">TABLE</span> <span class="keyword">IF</span> <span class="keyword">EXISTS</span> analytics.live.RAW_EVENTS;
+
+<span class="comment">-- CLUSTER BY is REQUIRED. Choose the column your most time-critical WHERE</span>
+<span class="comment">-- clause filters on, so serving queries prune micro-partitions.</span>
+<span class="keyword">CREATE</span> <span class="keyword">INTERACTIVE</span> <span class="keyword">TABLE</span> analytics.live.<span class="function">RAW_EVENTS</span> (
+    EVENT_ID        <span class="keyword">VARCHAR</span>       <span class="keyword">NOT</span> <span class="keyword">NULL</span>,
+    EVENT_TS        <span class="keyword">TIMESTAMP_NTZ</span> <span class="keyword">NOT</span> <span class="keyword">NULL</span>,
+    POSITION_ID     <span class="keyword">VARCHAR</span>       <span class="keyword">NOT</span> <span class="keyword">NULL</span>,
+    SECTOR          <span class="keyword">VARCHAR</span>,                 <span class="comment">-- denormalized: no join at serve time</span>
+    RATING          <span class="keyword">VARCHAR</span>,
+    CURRENT_MARK    <span class="keyword">NUMBER</span>(<span class="number">18</span>,<span class="number">4</span>),
+    PAYLOAD         <span class="keyword">VARIANT</span>,
+    IS_WATCHLIST    <span class="keyword">BOOLEAN</span>       <span class="keyword">DEFAULT</span> FALSE
+)
+<span class="keyword">CLUSTER</span> <span class="keyword">BY</span> (EVENT_TS);</pre>
+      <div class="three-col anim-fade">
+        <div class="card">
+          <h4>CLUSTER BY Is Mandatory</h4>
+          <p>Unlike a standard table, <code>CREATE INTERACTIVE TABLE</code> will not compile without it. It drives the pruning that makes sub-second serving possible, so match it to your hottest filter. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/tables-clustering-keys">Clustering keys</a></p>
+        </div>
+        <div class="card">
+          <h4>Column Lists Work</h4>
+          <p>The docs describe CTAS, but an explicit column list &mdash; with <code>NOT NULL</code>, <code>DEFAULT</code>, <code>VARIANT</code>, and <code>BOOLEAN</code> &mdash; is accepted and verified. That matters here, because there is no source table to select from. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-interactive-table">CREATE INTERACTIVE TABLE</a></p>
+        </div>
+        <div class="card">
+          <h4>Create From a Standard Warehouse</h4>
+          <p>Run the DDL on a standard warehouse. The interactive warehouse is only for querying &mdash; it cannot run this statement.</p>
+        </div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>No TARGET_LAG here, deliberately.</strong> Adding it would make this an auto-refreshing table sourced from another table, which reintroduces the refresh hop this pattern exists to remove. Leaving it off is what makes the streaming channel the sole writer.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="the-streaming-producer">
+      <h2>The Streaming Producer</h2>
+      <p style="margin-bottom: 1.5rem;">Ordinary HPA SDK code. Nothing here is interactive-table specific &mdash; that is the whole point.</p>
+      <pre class="anim-fade"><span class="keyword">class</span> StreamingService:
+    <span class="string">"""HPA producer: a channel pool with partition-based routing so rows for
+    one entity always land in order."""</span>
+
+    <span class="keyword">def</span> <span class="function">__init__</span>(<span class="keyword">self</span>, database, schema, table, partition_count=<span class="number">4</span>):
+        <span class="keyword">self</span>.table = table
+        <span class="comment"># The auto-created default pipe follows &lt;TABLE&gt;-STREAMING. Opening a</span>
+        <span class="comment"># channel against it is what causes Snowflake to create the pipe.</span>
+        <span class="keyword">self</span>.pipe_name = f<span class="string">"{table}-STREAMING"</span>
+        <span class="keyword">self</span>.partition_count = partition_count
+
+    <span class="keyword">def</span> <span class="function">open_channels</span>(<span class="keyword">self</span>):
+        <span class="keyword">self</span>.client = <span class="function">StreamingIngestClient</span>(
+            db_name=<span class="keyword">self</span>.database,
+            schema_name=<span class="keyword">self</span>.schema,
+            pipe_name=<span class="keyword">self</span>.pipe_name,
+        )
+        <span class="keyword">self</span>.channels = []
+        <span class="keyword">for</span> i <span class="keyword">in</span> <span class="function">range</span>(<span class="keyword">self</span>.partition_count):
+            ch, _ = <span class="keyword">self</span>.client.<span class="function">open_channel</span>(f<span class="string">"{self.table}_p{i}"</span>)
+            <span class="keyword">self</span>.channels.<span class="function">append</span>(ch)
+
+    <span class="keyword">def</span> <span class="function">append</span>(<span class="keyword">self</span>, row, partition):
+        <span class="comment"># wait_for_flush blocks until HPA commits, which is what lets you</span>
+        <span class="comment"># measure true end-to-end ingest-to-query latency.</span>
+        <span class="keyword">self</span>.channels[partition].<span class="function">append_row</span>(row)
+        <span class="keyword">self</span>.channels[partition].<span class="function">wait_for_flush</span>(timeout_seconds=<span class="number">10</span>)</pre>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>The Pipe Name Is the Contract</h4>
+          <p><code>&lt;TABLE&gt;-STREAMING</code> is the default pipe Snowflake creates when a channel is opened against a table. Point the SDK at it and the interactive table receives rows like any other target. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-getting-started">HPA SDK tutorial</a></p>
+        </div>
+        <div class="card">
+          <h4>Seeding Travels the Same Path</h4>
+          <p>Because DML is rejected, the initial baseline cannot be inserted with SQL. Have the producer emit one baseline row per entity at startup. Corrections are re-streamed snapshots, not updates.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Partition by entity key when per-entity ordering matters. Each channel preserves order within itself but not across channels, so routing one entity to one channel is what keeps its event sequence intact. Soft limits are 2,000 channels per pipe and 12 MBps per channel. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-limitations">HPA limits</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="warehouse-pairing">
+      <h2>Warehouse Pairing</h2>
+      <p style="margin-bottom: 1.5rem;">The table and the warehouse are explicitly bound. This step is easy to forget and the symptom is "it works but it is slow".</p>
+      <pre class="anim-fade"><span class="comment">-- The interactive warehouse. Minimum size is XSMALL; a fallback warehouse</span>
+<span class="comment">-- catches anything that runs long so it cannot occupy the low-latency pool.</span>
+<span class="keyword">CREATE</span> <span class="keyword">WAREHOUSE</span> <span class="keyword">IF</span> <span class="keyword">NOT</span> <span class="keyword">EXISTS</span> live_serving_wh
+  WAREHOUSE_TYPE = <span class="string">'INTERACTIVE'</span>
+  WAREHOUSE_SIZE = <span class="string">'XSMALL'</span>
+  <span class="keyword">COMMENT</span> = <span class="string">'Sub-second serving for the live dashboard'</span>;
+
+<span class="comment">-- Associate each interactive table with the warehouse that serves it.</span>
+<span class="comment">-- Without this the warehouse will not warm the table.</span>
+<span class="keyword">ALTER</span> <span class="keyword">WAREHOUSE</span> live_serving_wh <span class="keyword">ADD</span> <span class="keyword">TABLES</span> (analytics.live.RAW_EVENTS);
+
+<span class="comment">-- Serving query: aggregate at query time, filter on the clustering key.</span>
+<span class="keyword">SELECT</span> POSITION_ID, SECTOR, CURRENT_MARK
+<span class="keyword">FROM</span> analytics.live.RAW_EVENTS
+<span class="keyword">WHERE</span> EVENT_TS &gt;= <span class="keyword">DATEADD</span>(hour, -<span class="number">24</span>, <span class="keyword">SYSDATE</span>())
+<span class="keyword">QUALIFY</span> <span class="keyword">ROW_NUMBER</span>() <span class="keyword">OVER</span> (<span class="keyword">PARTITION</span> <span class="keyword">BY</span> POSITION_ID <span class="keyword">ORDER</span> <span class="keyword">BY</span> EVENT_TS DESC) = <span class="number">1</span>;</pre>
+      <div class="three-col anim-fade">
+        <div class="card">
+          <h4>The Wall Is One-Way</h4>
+          <p>An interactive warehouse can <em>only</em> read interactive tables. A standard warehouse can read them too &mdash; which is what makes an A/B latency comparison possible on the same object. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-interactive-warehouse">CREATE INTERACTIVE WAREHOUSE</a></p>
+        </div>
+        <div class="card">
+          <h4>Warming Is Capped at 10</h4>
+          <p>Proactive warming currently covers 10 interactive tables. You can query more than that, but only ten get pre-warmed. Support can raise it.</p>
+        </div>
+        <div class="card">
+          <h4>Configure a Fallback</h4>
+          <p>Queries running past 5 seconds are transparently re-run on the fallback warehouse, freeing the interactive pool. Without one configured you lose that isolation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="cost-traps">
+      <h2>Cost Traps</h2>
+      <p style="margin-bottom: 1.5rem;">Interactive warehouses do not bill like standard ones. This is the single most surprising part of the feature.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Billing Behaviour</h4>
+          <div class="spec-row"><span class="spec-label">Minimum auto-suspend</span><span class="spec-value">24 hours</span></div>
+          <div class="spec-row"><span class="spec-label">Manual suspend/resume min billing</span><span class="spec-value">1 hour</span></div>
+          <div class="spec-row"><span class="spec-label">Auto-scaling cluster minimum</span><span class="spec-value">1 hour</span></div>
+          <div class="spec-row"><span class="spec-label">Minimum warehouse size</span><span class="spec-value">XSMALL</span></div>
+          <div class="spec-row"><span class="spec-label">Long-query fallback threshold</span><span class="spec-value">5 seconds</span></div>
+        </div>
+        <div class="card">
+          <h4>What That Means in Practice</h4>
+          <p>A standard warehouse idles down in 60 seconds. An interactive warehouse holds for a <strong>minimum of 24 hours</strong> because its speed comes from a warm data cache that is expensive to rebuild.</p>
+          <p>Treat it as an always-on serving tier with a daily floor, not a burst resource. If the workload is not continuous, this is the wrong feature.</p>
+        </div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Resuming is not free either.</strong> Expect significant query latency right after a resume while the cache re-warms &mdash; so "suspend it overnight to save money" both costs an hour of billing and gives your first users the worst latency of the day. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/interactive">Auto-suspend and auto-resume</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="limits">
+      <h2>Limits</h2>
+      <p style="margin-bottom: 1.5rem;">Everything below is documented. Read it before designing, because several of these are load-bearing.</p>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>DML Is Almost Entirely Out</h4>
+          <p><code>UPDATE</code> and <code>DELETE</code> are unsupported. The only permitted DML is <code>INSERT OVERWRITE</code>. The documented alternative is auto-refresh with DML applied to the <em>source</em> table.</p>
+        </div>
+        <div class="card">
+          <h4>No Streams</h4>
+          <p>You cannot create a stream on an interactive table, so CDC-style downstream consumption has to come from somewhere else in the pipeline.</p>
+        </div>
+        <div class="card">
+          <h4>Not a Dynamic Table Base</h4>
+          <p>A dynamic table cannot use an interactive table as a base table. Chain in the other direction: interactive tables can be built <em>from</em> other sources.</p>
+        </div>
+        <div class="card">
+          <h4>ALTER TABLE Is Restricted</h4>
+          <p>No <code>ADD COLUMN</code> or <code>REMOVE COLUMN</code>. You <em>can</em> rename, set comments, and attach masking, row-access, join, aggregation, and storage-lifecycle policies.</p>
+        </div>
+        <div class="card">
+          <h4>No Fail-Safe</h4>
+          <p>Fail-safe recovery does not apply. Time Travel does work, inheriting <code>DATA_RETENTION_TIME_IN_DAYS</code> from the schema &mdash; you cannot set it on the table.</p>
+        </div>
+        <div class="card">
+          <h4>No Stored Procedures</h4>
+          <p>An interactive warehouse cannot run <code>CALL</code>, and cannot use the <code>-&gt;&gt;</code> pipe operator, which relies on procedures internally.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Materialized views on interactive tables require the <code>INTERACTIVE</code> keyword; a standard materialized view cannot use one as its source. Query Insights are not collected for queries executing on interactive tables. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/interactive">Full limitations list</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="verifying-your-own-claims">
+      <h2>Verifying Your Own Claims</h2>
+      <p style="margin-bottom: 1.5rem;">Provisioning an interactive table proves nothing about whether anything reads it. Check all three gates.</p>
+      <pre class="anim-fade"><span class="comment">-- Gate 1: is the object actually the type you claim?</span>
+<span class="keyword">SHOW</span> <span class="keyword">INTERACTIVE</span> <span class="keyword">TABLES</span> <span class="keyword">IN</span> SCHEMA analytics.live;
+<span class="comment">-- target_lag NULL + refresh_warehouse NULL means nothing auto-refreshes it,</span>
+<span class="comment">-- so any rows present arrived some other way.</span>
+
+<span class="comment">-- Gate 2: does a streaming pipe really target it?</span>
+<span class="keyword">SHOW</span> PIPES <span class="keyword">IN</span> SCHEMA analytics.live;
+<span class="comment">-- Look for kind = STREAMING and is_snowflake_managed = true.</span>
+
+<span class="comment">-- Gate 3: is it exercised, on the warehouse you claim?</span>
+<span class="keyword">SELECT</span> WAREHOUSE_NAME, <span class="keyword">COUNT</span>(*) <span class="keyword">AS</span> queries,
+       <span class="function">MEDIAN</span>(TOTAL_ELAPSED_TIME) <span class="keyword">AS</span> p50_ms
+<span class="keyword">FROM</span> SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+<span class="keyword">WHERE</span> QUERY_TEXT <span class="keyword">ILIKE</span> <span class="string">'%RAW_EVENTS%'</span>
+  <span class="keyword">AND</span> QUERY_TYPE = <span class="string">'SELECT'</span>
+  <span class="keyword">AND</span> START_TIME &gt;= <span class="keyword">DATEADD</span>(day, -<span class="number">7</span>, <span class="keyword">CURRENT_TIMESTAMP</span>())
+<span class="keyword">GROUP</span> <span class="keyword">BY</span> <span class="number">1</span> <span class="keyword">ORDER</span> <span class="keyword">BY</span> queries DESC;
+
+<span class="comment">-- Negative control: prove no SQL wrote the rows.</span>
+<span class="keyword">SELECT</span> QUERY_TYPE, <span class="keyword">COUNT</span>(*)
+<span class="keyword">FROM</span> SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY
+<span class="keyword">WHERE</span> QUERY_TEXT <span class="keyword">ILIKE</span> <span class="string">'%RAW_EVENTS%'</span> <span class="keyword">AND</span> QUERY_TYPE &lt;&gt; <span class="string">'SELECT'</span>
+  <span class="keyword">AND</span> START_TIME &gt;= <span class="keyword">DATEADD</span>(day, -<span class="number">40</span>, <span class="keyword">CURRENT_TIMESTAMP</span>())
+<span class="keyword">GROUP</span> <span class="keyword">BY</span> <span class="number">1</span>;</pre>
+      <p style="margin-bottom: 1rem;">Then stop the claim from silently regressing. Naming an object after a feature is not the same as using it:</p>
+      <pre class="anim-fade"><span class="comment">// CI guard: assert the serving layer reads the object the docs brag about.</span>
+<span class="comment">// This exists because a shadow view is invisible in a README review.</span>
+<span class="function">describe</span>(<span class="string">"queries.ts - interactive source"</span>, () =&gt; {
+  <span class="function">it</span>(<span class="string">"no query references the retired rollup table or view"</span>, () =&gt; {
+    <span class="keyword">for</span> (<span class="keyword">const</span> [name, sql] of ALL_QUERIES) {
+      <span class="function">expect</span>(`${name}:${sql}`).not.<span class="function">toMatch</span>(/PORTFOLIO_LIVE/);
+    }
+  });
+
+  <span class="function">it</span>(<span class="string">"every query reads from an interactive table"</span>, () =&gt; {
+    <span class="keyword">for</span> (<span class="keyword">const</span> [name, sql] of ALL_QUERIES) {
+      <span class="keyword">const</span> readsIT = sql.<span class="function">includes</span>(`${SCHEMA}.RAW_EVENTS`)
+                   || sql.<span class="function">includes</span>(`${SCHEMA}.POSITION_BOOK`);
+      <span class="function">expect</span>(`${name}:${readsIT}`).<span class="function">toBe</span>(`${name}:<span class="keyword">true</span>`);
+    }
+  });
+
+  <span class="function">it</span>(<span class="string">"no query joins the dimension table"</span>, () =&gt; {
+    <span class="keyword">for</span> (<span class="keyword">const</span> [name, sql] of ALL_QUERIES) {
+      <span class="function">expect</span>(`${name}:${sql}`).not.<span class="function">toMatch</span>(/POSITIONS_DIM/);
+    }
+  });
+});</pre>
+      <div class="highlight-box anim-fade">
+        <p><strong>The failure this prevents:</strong> a demo shipped with an interactive table provisioned, an interactive warehouse running, and a README describing both &mdash; while every dashboard query read a plain view over a standard table. The DDL was added to tell the story; the query layer was copied from the parent fork and never repointed. The claim lived in Markdown, reality lived in code, and nothing diffed them.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="takeaways">
+      <h2>Takeaways</h2>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">1</div><div class="step-title">CLUSTER BY required</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">2</div><div class="step-title">Stream to TABLE-STREAMING</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">3</div><div class="step-title">ADD TABLES to pair</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">4</div><div class="step-title">Budget 24h minimum</div></div>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>One Object, One Truth</h4><p>The streaming target and the serving layer are the same table, so freshness equals ingest latency and there is no second object to diverge.</p></div>
+        <div class="card"><h4>Denormalize Deliberately</h4><p>Interactive warehouses only join interactive tables. Push dimension attributes onto the events so serving queries never join.</p></div>
+        <div class="card"><h4>Append-Only Thinking</h4><p>DML is effectively unavailable. Design corrections as re-streamed snapshots and take latest-per-key at query time.</p></div>
+        <div class="card"><h4>Always-On Economics</h4><p>A 24-hour minimum auto-suspend makes this a serving tier, not a burst resource. Continuous workloads only.</p></div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Before you take this to a customer:</strong> both halves are GA and the pattern ships as a first-party <a href="https://www.snowflake.com/en/developers/guides/interactive-tables-snowpipe-streaming-arcade-lab/">Snowflake quickstart</a> with runnable code, so you can demo and recommend it. Point people at the quickstart rather than the product guide, which does not cover streaming ingestion. Note the quickstart is marked "provided as is" and not maintained on an ongoing basis.</p>
+      </div>
+      <div class="context-box anim-fade">
+        <p><strong>Reference</strong> &mdash;
+          <a class="badge-green" href="https://www.snowflake.com/en/developers/guides/interactive-tables-snowpipe-streaming-arcade-lab/">Quickstart: Streaming into Interactive Tables</a>
+          <a class="badge-green" href="https://github.com/Snowflake-Labs/Summit26-InteractiveLab">Lab repo: Summit26-InteractiveLab</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/interactive">Interactive tables guide</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-interactive-table">CREATE INTERACTIVE TABLE</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-interactive-warehouse">CREATE INTERACTIVE WAREHOUSE</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-12-11-interactive-tables-ga">Interactive tables GA</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/data-load-snowpipe-streaming-overview">Snowpipe Streaming</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-09-23-snowpipe-streaming-high-performance-architecture">HPA GA</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-limitations">HPA limits</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/snowpipe-streaming/snowpipe-streaming-high-performance-getting-started">HPA SDK tutorial</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

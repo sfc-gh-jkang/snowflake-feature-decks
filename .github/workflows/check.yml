@@ -1,0 +1,71 @@
+name: check
+
+# The claim-audit rule requires the guard to live in CI so it cannot silently
+# regress. For a docs repo the analogue of "assert the serving query hits the
+# claimed object" is: assert every deck is structurally sound and leaks nothing.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  decks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate every deck
+        run: |
+          shopt -s nullglob
+          found=0
+          for deck in */presentations/*.html; do
+            found=1
+            python3 scripts/new_deck.py --check "$deck"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no decks found under */presentations/ -- check the layout"
+            exit 1
+          fi
+
+      - name: Highlighter self-test
+        run: |
+          # The isolation guarantee is the whole point of the one-pass tokenizer:
+          # a keyword inside a string or comment must not be wrapped.
+          out=$(printf "SELECT 'select from' AS x FROM t\n" | python3 scripts/highlight.py sql)
+          echo "$out"
+          echo "$out" | grep -q '<span class="string">.select from.</span>' \
+            || { echo "FAIL: string literal not treated as one token"; exit 1; }
+          echo "$out" | grep -q 'class="keyword">select from' \
+            && { echo "FAIL: keyword wrapped inside a string literal"; exit 1; }
+          echo "SQL isolation OK"
+
+          # YAML keys are matched structurally, so a workflow's `on:` trigger must
+          # style as a key and not as the boolean `on`.
+          y=$(printf 'on:\n  push:\nwith:\n  use-oidc: true\n' | python3 scripts/highlight.py yaml)
+          echo "$y"
+          echo "$y" | grep -q '<span class="function">on</span>:' \
+            || { echo "FAIL: yaml key 'on' not styled as a key"; exit 1; }
+          echo "$y" | grep -q '<span class="keyword">true</span>' \
+            || { echo "FAIL: yaml boolean not styled"; exit 1; }
+          echo "YAML key/scalar OK"
+
+      - name: Every deck cites documentation
+        run: |
+          for deck in */presentations/*.html; do
+            n=$(grep -o 'docs\.snowflake\.com' "$deck" | wc -l | tr -d ' ')
+            echo "$deck: $n doc citations"
+            [ "$n" -ge 3 ] || { echo "FAIL: $deck has fewer than 3 doc citations"; exit 1; }
+          done
+
+      - name: Speaker notes accompany every deck
+        run: |
+          for deck in */presentations/*.html; do
+            notes="${deck%.html}-speaker-notes.md"
+            [ -f "$notes" ] || { echo "FAIL: missing $notes"; exit 1; }
+          done
+          echo "speaker notes present for all decks"

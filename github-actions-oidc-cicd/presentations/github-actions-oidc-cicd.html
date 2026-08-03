@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secretless CI/CD: Deploying to Snowflake from GitHub Actions</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Secretless CI/CD</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Concepts</div>
+      <a href="#hero">Overview</a>
+      <a href="#why-secretless">Why Secretless</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#auth-comparison">Auth Methods</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Setup</div>
+      <a href="#the-service-user">Service User</a>
+      <a href="#choosing-a-subject">Choosing a Subject</a>
+      <a href="#the-workflow">The Workflow</a>
+      <a href="#version-pinning">Version Pinning</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Operating</div>
+      <a href="#the-network-policy-wall">Network Policy Wall</a>
+      <a href="#named-connections">Named Connections</a>
+      <a href="#what-you-can-deploy">What You Can Deploy</a>
+      <a href="#other-auth-methods">Without OIDC</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Limits</div>
+      <a href="#limits-and-gotchas">Limits &amp; Gotchas</a>
+      <a href="#cross-provider">Beyond GitHub</a>
+      <a href="#takeaways">Takeaways</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>Secretless CI/CD: Deploying to Snowflake from GitHub Actions</h1>
+      <p class="subtitle">OIDC replaces the stored private key with a short-lived token GitHub mints per run. The auth is the easy part &mdash; the network policy is what actually blocks you.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">Zero</div><div class="stat-label">Long-lived Snowflake secrets in GitHub</div></div>
+        <div class="stat-card"><div class="stat-value">1 : 1</div><div class="stat-label">One service user maps to exactly one subject</div></div>
+        <div class="stat-card"><div class="stat-value">3.11+</div><div class="stat-label">Minimum Snowflake CLI version for OIDC</div></div>
+        <div class="stat-card"><div class="stat-value">250001</div><div class="stat-label">The error you will actually hit first</div></div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>Recommended path is <code>snowflakedb/snowflake-actions@v3</code> with <code>use-oidc: true</code>. Everything on the setup slides is doc-backed; the network-policy slide is marked where it draws on field experience. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">Snowflake CLI GitHub Action</a> <a class="badge-purple" href="https://github.com/snowflakedb/snowflake-actions">Action source</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="why-secretless">
+      <h2>Why Secretless</h2>
+      <p style="margin-bottom: 1.5rem;">A stored key pair works. It also creates three problems that never fully go away.</p>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Rotation Is Manual</h4><p>A private key in GitHub Secrets has no expiry and no rotation mechanism. It stays valid until a human remembers to replace it in both places.</p></div>
+        <div class="card"><h4>Blast Radius Is Permanent</h4><p>If the secret leaks, it is valid until revoked. A short-lived OIDC token issued per run is useless minutes later.</p></div>
+        <div class="card"><h4>Scope Is Coarse</h4><p>A key authenticates anyone holding it. An OIDC subject binds trust to a specific repository and a specific branch, PR, or environment.</p></div>
+        <div class="card"><h4>Auditability Is Weaker</h4><p>Key-based auth tells you a user connected. Subject-bound OIDC tells you which repository and ref the deploy came from.</p></div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>The trade:</strong> you give up a secret you control and gain a trust relationship you configure once. The setup is slightly more involved; the ongoing maintenance is close to zero, because there is nothing to rotate. Workload identity federation is the underlying mechanism. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/workload-identity-federation">Workload identity federation</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="how-it-works">
+      <h2>How the Exchange Works</h2>
+      <p style="margin-bottom: 1.5rem;">Nothing is stored. GitHub mints a token, Snowflake validates it directly.</p>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">Step 1</div><div class="step-title">Workflow requests an OIDC token</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 2</div><div class="step-title">GitHub signs it with repo + ref claims</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">Step 3</div><div class="step-title">Action exports workload-identity env vars</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">Step 4</div><div class="step-title">Snowflake validates issuer + subject</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 5</div><div class="step-title">CLI runs as the service user</div></div>
+      </div>
+      <p style="margin-bottom: 1rem;">With <code>use-oidc: true</code> the action exports these for every later step in the job:</p>
+      <pre class="anim-fade">SNOWFLAKE_AUTHENTICATOR=WORKLOAD_IDENTITY
+SNOWFLAKE_WORKLOAD_IDENTITY_PROVIDER=OIDC
+SNOWFLAKE_AUDIENCE=snowflakecomputing.com
+SNOWFLAKE_TOKEN=&lt;short-lived GitHub OIDC token&gt;</pre>
+      <div class="context-box anim-fade">
+        <p>The action also installs Python 3.11 and <code>uv</code>, then installs the CLI in an isolated environment via <code>uv tool install snowflake-cli</code>. After it completes, <code>snow</code> is on <code>PATH</code> for the rest of the job &mdash; there is no Python version for you to manage. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">How it works</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="auth-comparison">
+      <h2>Three Ways to Authenticate</h2>
+      <p style="margin-bottom: 1.5rem;">All three are supported. Only one avoids storing a long-lived credential.</p>
+      <table class="anim-fade">
+        <thead><tr><th>Method</th><th>Security</th><th>Secrets required</th><th>CLI version</th></tr></thead>
+        <tbody>
+          <tr><td>WIF with OIDC <span class="badge-green">recommended</span></td><td>Secretless, short-lived tokens</td><td>Snowflake account only</td><td>3.11 or later</td></tr>
+          <tr><td>Key pair</td><td>Private key in GitHub Secrets</td><td>Private key, account, user</td><td>Any</td></tr>
+          <tr><td>Password <span class="badge-red">legacy</span></td><td>Password in GitHub Secrets</td><td>Password, account, user</td><td>Any</td></tr>
+        </tbody>
+      </table>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Note What OIDC Still Needs</h4>
+          <p>Even secretless, you store <code>SNOWFLAKE_ACCOUNT</code> as a secret. That is an identifier, not a credential &mdash; it cannot authenticate anything on its own.</p>
+        </div>
+        <div class="card">
+          <h4>When Key Pair Still Wins</h4>
+          <p>Self-hosted runners on a fixed egress IP, or any provider without an OIDC trust relationship configured. Key pair remains fully supported, not deprecated.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="part-divider" id="part-setup">
+      <h1>Part 2</h1>
+      <h2>Setup</h2>
+    </section>
+
+    <section class="slide" id="the-service-user">
+      <h2>The Service User</h2>
+      <p style="margin-bottom: 1.5rem;">One Snowflake object establishes the trust. Note <code>TYPE = SERVICE</code> &mdash; this user has no password and cannot log in interactively.</p>
+      <pre class="anim-fade"><span class="keyword">CREATE</span> USER gh_deploy_ci
+  <span class="keyword">TYPE</span> = SERVICE
+  WORKLOAD_IDENTITY = (
+    <span class="keyword">TYPE</span> = OIDC
+    ISSUER = <span class="string">'https://token.actions.githubusercontent.com'</span>
+    SUBJECT = <span class="string">'repo:my-org/my-repo:ref:refs/heads/main'</span>
+  );
+
+<span class="comment">-- Least privilege: give the deploy role only what the pipeline touches.</span>
+<span class="keyword">CREATE</span> <span class="keyword">ROLE</span> deploy_ci_rl;
+<span class="keyword">GRANT</span> USAGE <span class="keyword">ON</span> <span class="keyword">WAREHOUSE</span> ci_wh <span class="keyword">TO</span> <span class="keyword">ROLE</span> deploy_ci_rl;
+<span class="keyword">GRANT</span> USAGE <span class="keyword">ON</span> DATABASE app_db <span class="keyword">TO</span> <span class="keyword">ROLE</span> deploy_ci_rl;
+<span class="keyword">GRANT</span> <span class="keyword">ROLE</span> deploy_ci_rl <span class="keyword">TO</span> USER gh_deploy_ci;
+<span class="keyword">ALTER</span> USER gh_deploy_ci <span class="keyword">SET</span> DEFAULT_ROLE = deploy_ci_rl;</pre>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>The Issuer Is Fixed</h4>
+          <p><code>https://token.actions.githubusercontent.com</code> is GitHub's OIDC issuer. It is the same for every repository &mdash; only the subject varies.</p>
+        </div>
+        <div class="card">
+          <h4>One User, One Subject</h4>
+          <p>A <code>WORKLOAD_IDENTITY</code> definition carries a single subject. Deploying from both <code>main</code> and pull requests means two service users, or a broader custom claim.</p>
+        </div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>Because the trust is scoped to a repo and ref rather than to a secret, treat the service user as per-pipeline rather than per-team. A user bound to <code>main</code> in one repo cannot be replayed from anywhere else, which is most of the security benefit. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/workload-identity-federation">WIF reference</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="choosing-a-subject">
+      <h2>Choosing a Subject</h2>
+      <p style="margin-bottom: 1.5rem;">The <code>SUBJECT</code> must match the claim GitHub actually emits. Three documented formats, and one rule that overrides the others.</p>
+      <table class="anim-fade">
+        <thead><tr><th>Subject format</th><th>Matches</th><th>Workflow requirement</th></tr></thead>
+        <tbody>
+          <tr><td><code>repo:&lt;owner&gt;/&lt;repo&gt;:ref:refs/heads/&lt;branch&gt;</code></td><td>Push to that branch</td><td><code>on: push</code>, no <code>environment:</code> on the job</td></tr>
+          <tr><td><code>repo:&lt;owner&gt;/&lt;repo&gt;:pull_request</code></td><td>Any pull request event</td><td><code>on: pull_request</code>, no <code>environment:</code> on the job</td></tr>
+          <tr><td><code>repo:&lt;owner&gt;/&lt;repo&gt;:environment:&lt;name&gt;</code></td><td>Job targets a named environment</td><td>Job sets <code>environment:</code>, which must exist in repo settings</td></tr>
+        </tbody>
+      </table>
+      <div class="warning-box anim-fade">
+        <p><strong>The rule that catches people:</strong> when a job sets <code>environment:</code>, GitHub emits the <em>environment</em> subject form <strong>regardless of the trigger</strong>. So a service user configured for <code>ref:refs/heads/main</code> will fail on a push if the job also declares an environment. If you add an environment for approval gating later, the subject must change too.</p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Need something broader &mdash; every branch in a repo, or every repo under an org &mdash; then customize the subject to include a claim such as <code>repository_owner</code>. That is configured on the GitHub side. <a class="badge-purple" href="https://docs.github.com/en/actions/reference/security/oidc">GitHub OIDC reference</a> <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">Subject formats</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="the-workflow">
+      <h2>The Workflow</h2>
+      <p style="margin-bottom: 1.5rem;">Two things make OIDC work: the <code>id-token: write</code> permission and <code>use-oidc: true</code>. Omitting the permission is the most common first failure.</p>
+      <pre class="anim-fade"><span class="function">name</span>: Deploy to Snowflake
+<span class="function">on</span>:
+  <span class="function">push</span>:
+    <span class="function">branches</span>:
+      - main
+
+<span class="function">permissions</span>:
+  <span class="function">id-token</span>: write   <span class="comment"># required: lets the job request an OIDC token</span>
+  <span class="function">contents</span>: read
+
+<span class="function">jobs</span>:
+  <span class="function">deploy</span>:
+    <span class="function">runs-on</span>: ubuntu-latest
+    <span class="function">steps</span>:
+      - <span class="function">uses</span>: actions/checkout@v4
+        <span class="function">with</span>:
+          <span class="function">persist-credentials</span>: <span class="keyword">false</span>
+
+      - <span class="function">uses</span>: snowflakedb/snowflake-actions@v3
+        <span class="function">with</span>:
+          <span class="function">use-oidc</span>: <span class="keyword">true</span>
+          <span class="function">cli-version</span>: <span class="string">"3.16"</span>
+
+      - <span class="function">name</span>: Deploy
+        <span class="function">env</span>:
+          <span class="function">SNOWFLAKE_ACCOUNT</span>: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+        <span class="function">run</span>: |
+          snow connection test -x
+          snow dcm deploy --target PROD -x</pre>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4><code>id-token: write</code></h4><p>Without it GitHub will not mint a token and the action cannot authenticate. It is a job permission, not an action input.</p></div>
+        <div class="card"><h4><code>persist-credentials: false</code></h4><p>Stops checkout leaving a Git credential on the runner. Good hygiene in any workflow, and it costs nothing.</p></div>
+        <div class="card"><h4>Pin <code>cli-version</code></h4><p>Omitted means latest, which means your pipeline can change under you. Pin it and bump deliberately.</p></div>
+        <div class="card"><h4><code>-x</code> Everywhere</h4><p>Exits non-zero on error so a failed deploy fails the job instead of passing silently.</p></div>
+      </div>
+    </section>
+
+    <section class="slide" id="version-pinning">
+      <h2>Version Pinning</h2>
+      <p style="margin-bottom: 1.5rem;">Two independent things to pin: the action, and the CLI it installs.</p>
+      <pre class="anim-fade"><span class="comment"># Floating major tag: follows the latest v3 release.</span>
+- <span class="function">uses</span>: snowflakedb/snowflake-actions@v3
+
+<span class="comment"># Patch tag: pinned to one release.</span>
+- <span class="function">uses</span>: snowflakedb/snowflake-actions@v3.<span class="number">0.0</span>
+
+<span class="comment"># Commit SHA: fully immutable, the supply-chain-safe option.</span>
+- <span class="function">uses</span>: snowflakedb/snowflake-actions@a1b2c3d4e5f67890abcdef1234567890abcdef12</pre>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Pinning the Action</h4>
+          <div class="spec-row"><span class="spec-label">Commit SHA</span><span class="spec-value">Immutable, recommended</span></div>
+          <div class="spec-row"><span class="spec-label">Patch tag <code>@v3.0.0</code></span><span class="spec-value">Specific release</span></div>
+          <div class="spec-row"><span class="spec-label">Major tag <code>@v3</code></span><span class="spec-value">Follows latest v3</span></div>
+        </div>
+        <div class="card">
+          <h4>Pinning the CLI</h4>
+          <div class="spec-row"><span class="spec-label"><code>cli-version</code></span><span class="spec-value">e.g. 3.16 or 3.16.0</span></div>
+          <div class="spec-row"><span class="spec-label">Omitted</span><span class="spec-value">Installs latest</span></div>
+          <div class="spec-row"><span class="spec-label"><code>custom-github-ref</code></span><span class="spec-value">Branch/tag/commit, for testing</span></div>
+        </div>
+      </div>
+      <div class="info-box anim-fade">
+        <p><code>cli-version</code> and <code>custom-github-ref</code> are mutually exclusive &mdash; setting both is an error. Use <code>custom-github-ref</code> only to try an unreleased CLI change or a fork, never in a production pipeline. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">Inputs</a></p>
+      </div>
+    </section>
+
+    <section class="part-divider" id="part-operating">
+      <h1>Part 3</h1>
+      <h2>Operating It</h2>
+    </section>
+
+    <section class="slide" id="the-network-policy-wall">
+      <h2>The Network Policy Wall</h2>
+      <p style="margin-bottom: 1.5rem;">Auth will be working and the deploy will still fail. This is the step nobody warns you about.</p>
+      <div class="warning-box anim-fade">
+        <p><strong>Symptom:</strong> OIDC succeeds, then Snowflake rejects the connection with <code>250001</code> &mdash; IP not allowed. GitHub-hosted runners have ephemeral IPs from very large ranges, so any account with a network policy blocks them by default. This is not an auth problem and no amount of subject-fixing will help.</p>
+      </div>
+      <pre class="anim-fade"><span class="comment">-- Snowflake publishes a managed rule covering GitHub's runner ranges.</span>
+<span class="comment">-- Attach it as a USER-level policy on the service user, so it overrides</span>
+<span class="comment">-- the account policy for this token-only user and nothing else.</span>
+<span class="keyword">CREATE</span> NETWORK <span class="keyword">POLICY</span> gh_ci_policy
+  ALLOWED_NETWORK_RULE_LIST = (<span class="string">'SNOWFLAKE.NETWORK_SECURITY.GITHUBACTIONS_GLOBAL'</span>);
+
+<span class="keyword">ALTER</span> USER gh_deploy_ci <span class="keyword">SET</span> NETWORK_POLICY = gh_ci_policy;</pre>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Why User-Level</h4>
+          <p>A user-level network policy overrides the account policy for that user alone. The service user can reach Snowflake from GitHub's ranges while every human account stays restricted to the corporate network.</p>
+        </div>
+        <div class="card">
+          <h4>Why the Managed Rule</h4>
+          <p>Snowflake maintains the CIDR list and updates it as GitHub changes ranges. Hand-maintaining thousands of CIDRs is not a viable alternative. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/network-policies">Network policies</a></p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p><strong>Field note:</strong> where the account policy is org-managed and cannot be overridden per user, this path is closed &mdash; use a self-hosted runner on an already-allowlisted IP instead. Verify on a throwaway branch before switching a production pipeline, because a service user carries exactly one subject and a mismatch fails closed.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="named-connections">
+      <h2>Named Connections</h2>
+      <p style="margin-bottom: 1.5rem;">Some commands need a named connection rather than environment variables. That changes where the OIDC token has to land.</p>
+      <pre class="anim-fade">default_connection_name = <span class="string">"ci"</span>
+
+[connections.ci]
+<span class="comment"># Left empty on purpose: values arrive from the environment at run time.</span></pre>
+      <pre class="anim-fade">- <span class="function">uses</span>: snowflakedb/snowflake-actions@v3
+  <span class="function">with</span>:
+    <span class="function">use-oidc</span>: <span class="keyword">true</span>
+    <span class="function">default-config-file-path</span>: <span class="string">"config.toml"</span>
+    <span class="comment"># Token must be exported under the connection-specific variable name.</span>
+    <span class="function">oidc-token-name</span>: SNOWFLAKE_CONNECTIONS_CI_TOKEN
+- <span class="function">name</span>: Deploy
+  <span class="function">env</span>:
+    <span class="function">SNOWFLAKE_ACCOUNT</span>: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  <span class="function">run</span>: snow sql -c ci -q <span class="string">"SELECT CURRENT_USER()"</span> -x</pre>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>The Naming Rule</h4><p><code>SNOWFLAKE_CONNECTIONS_&lt;NAME&gt;_TOKEN</code>, where <code>&lt;NAME&gt;</code> is the uppercased connection name. For <code>[connections.ci]</code> that is <code>SNOWFLAKE_CONNECTIONS_CI_TOKEN</code>.</p></div>
+        <div class="card"><h4>Default Is Plain</h4><p>Without <code>oidc-token-name</code> the token exports as <code>SNOWFLAKE_TOKEN</code>, which only works for the default temporary connection.</p></div>
+        <div class="card"><h4>Commit an Empty Block</h4><p>The <code>config.toml</code> in the repo declares the connection name and nothing else. Values come from the environment, so no secret is committed.</p></div>
+        <div class="card"><h4>Permissions Differ by OS</h4><p>The copied <code>config.toml</code> gets <code>0600</code> on Linux and macOS. On Windows permissions are not modified &mdash; never commit secrets there regardless. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/connecting/configure-connections">Configure connections</a></p></div>
+      </div>
+    </section>
+
+    <section class="slide" id="what-you-can-deploy">
+      <h2>What You Can Deploy</h2>
+      <p style="margin-bottom: 1.5rem;">Once <code>snow</code> is on <code>PATH</code> and authenticated, the pipeline is ordinary CLI usage.</p>
+      <div class="flow-row anim-fade">
+        <div class="flow-box"><h4>DCM Projects</h4><p><code>snow dcm deploy --target PROD</code> for declarative database change management.</p></div>
+        <div class="flow-box"><h4>dbt Projects</h4><p>Deploy and execute dbt projects that run natively on Snowflake. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/data-engineering/dbt-projects-on-snowflake-ci-cd">dbt CI/CD</a></p></div>
+        <div class="flow-box"><h4>Streamlit</h4><p><code>snow streamlit deploy</code> for apps in Snowflake.</p></div>
+        <div class="flow-box"><h4>Native Apps</h4><p>Application packages and versions from the same pipeline.</p></div>
+        <div class="flow-box"><h4>Plain SQL</h4><p><code>snow sql -f migration.sql</code> when a migration is all you need.</p></div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>Design the pipeline around validate-then-deploy:</strong> run the same commands on a pull request with a PR-scoped service user against a dev target, then on merge to <code>main</code> with a separate main-scoped user against prod. Two subjects, two users, one workflow file. This is where the one-user-one-subject constraint stops being an annoyance and becomes the safety property.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="other-auth-methods">
+      <h2>When You Cannot Use OIDC</h2>
+      <p style="margin-bottom: 1.5rem;">Key pair remains fully supported. Password is supported but should not be in a production pipeline.</p>
+      <pre class="anim-fade">- <span class="function">uses</span>: snowflakedb/snowflake-actions@v3
+  <span class="function">with</span>:
+    <span class="function">cli-version</span>: <span class="string">"3.16.0"</span>
+- <span class="function">name</span>: Deploy
+  <span class="function">env</span>:
+    <span class="function">SNOWFLAKE_AUTHENTICATOR</span>: SNOWFLAKE_JWT
+    <span class="function">SNOWFLAKE_USER</span>: ${{ secrets.SNOWFLAKE_USER }}
+    <span class="function">SNOWFLAKE_ACCOUNT</span>: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+    <span class="function">SNOWFLAKE_PRIVATE_KEY_RAW</span>: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_RAW }}
+    <span class="function">PRIVATE_KEY_PASSPHRASE</span>: ${{ secrets.PRIVATE_KEY_PASSPHRASE }}
+  <span class="function">run</span>: |
+    snow connection test -x
+    snow dcm deploy --target PROD -x</pre>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Legitimate Reasons to Stay on Key Pair</h4>
+          <p>An org-managed account network policy you cannot override per user. A self-hosted runner already on an allowlisted IP. A CI provider without an OIDC trust configured.</p>
+        </div>
+        <div class="card">
+          <h4>Password: Legacy Only</h4>
+          <p>Supported for existing workflows, explicitly not recommended for production CI/CD. If you must, omit <code>SNOWFLAKE_AUTHENTICATOR</code> and pass <code>SNOWFLAKE_PASSWORD</code> &mdash; and enable MFA caching.</p>
+        </div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>Migration from the predecessor action is a one-line change: <code>snowflakedb/snowflake-cli-action@v2</code> becomes <code>snowflakedb/snowflake-actions@v3</code>, with identical inputs. The old path keeps working, but new workflows should use the current one. <a class="badge-purple" href="https://github.com/snowflakedb/snowflake-actions">Release notes</a></p>
+      </div>
+    </section>
+
+    <section class="part-divider" id="part-limits">
+      <h1>Part 4</h1>
+      <h2>Limits and Alternatives</h2>
+    </section>
+
+    <section class="slide" id="limits-and-gotchas">
+      <h2>Limits and Gotchas</h2>
+      <p style="margin-bottom: 1.5rem;">The things worth knowing before you commit a pipeline to this path.</p>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>GitHub Actions Only, For Now</h4><p>The <code>snow auth oidc</code> commands are documented as currently limited to GitHub Actions as the provider. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/command-reference/auth-commands/overview">auth oidc commands</a></p></div>
+        <div class="card"><h4>One Subject Per User</h4><p>Branch, PR, and environment each need their own service user, unless you broaden the claim on the GitHub side.</p></div>
+        <div class="card"><h4>The <code>environment:</code> Override</h4><p>Adding <code>environment:</code> to a job silently changes the emitted subject. Adding an approval gate later will break a ref-scoped user.</p></div>
+        <div class="card"><h4>No Reusable Bearer Token</h4><p>OIDC yields a short-lived token for the CLI, not a static bearer you can reuse in an arbitrary HTTP header. Anything needing that still needs a PAT &mdash; scope it to those steps only.</p></div>
+        <div class="card"><h4>CLI 3.11 Minimum</h4><p>Older CLI versions cannot do OIDC at all. Pin at or above 3.11.</p></div>
+        <div class="card"><h4>Windows Permissions</h4><p>The action does not tighten <code>config.toml</code> permissions on Windows runners. Keep credentials in GitHub Secrets.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>The action runs on Ubuntu, macOS, and Windows GitHub-hosted runners and is tested against Python 3.10 and 3.13. Validate any change on a throwaway branch first &mdash; a subject mismatch fails closed, which is safe but opaque if you are debugging under time pressure. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">Platform support</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="cross-provider">
+      <h2>Beyond GitHub</h2>
+      <p style="margin-bottom: 1.5rem;">Snowflake ships first-party CI/CD integrations for other providers too, at differing maturity.</p>
+      <div class="flow-row anim-fade">
+        <div class="flow-box"><h4>GitHub Actions</h4><p><code>snowflakedb/snowflake-actions@v3</code>. The most complete path, and the only one with documented OIDC support today. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">Docs</a></p></div>
+        <div class="flow-box"><h4>GitLab</h4><p>A Snowflake-provided CI component with a comparable shape. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/gitlab-component">GitLab component</a></p></div>
+        <div class="flow-box"><h4>Azure DevOps</h4><p>An extension covering the same deploy surface. <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/integrate-ci-cd">All integrations</a></p></div>
+      </div>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>The Portable Part</h4>
+          <p>The Snowflake side barely changes. A service user with <code>TYPE = SERVICE</code>, a least-privilege role, and a network policy are the same regardless of which CI system calls in.</p>
+        </div>
+        <div class="card">
+          <h4>The Provider-Specific Part</h4>
+          <p>The trust configuration and the claim format differ per provider. Check current OIDC support before assuming parity with GitHub &mdash; the CLI's OIDC commands are documented as GitHub-only for now.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>For a guided end-to-end walkthrough rather than a reference, Snowflake publishes a developer guide covering pipeline setup step by step. <a class="badge-purple" href="https://www.snowflake.com/en/developers/guides/configure-cicd-integrations-with-snowflake">Configure CI/CD integrations</a> <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/builders/devops-with-snowflake">DevOps with Snowflake</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="takeaways">
+      <h2>Takeaways</h2>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">1</div><div class="step-title">Service user + subject</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">2</div><div class="step-title">User-level network policy</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">3</div><div class="step-title">id-token: write + use-oidc</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">4</div><div class="step-title">Test on a throwaway branch</div></div>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>The Network Policy Is the Real Work</h4><p>Auth is a dozen lines. The <code>250001</code> IP rejection is what actually stops the first attempt, and it is fixed with a user-level policy using the managed GitHub Actions rule.</p></div>
+        <div class="card"><h4>One Subject Per User</h4><p>Treat service users as per-pipeline, not per-team. PR-scoped and main-scoped users give you validate-then-deploy for free.</p></div>
+        <div class="card"><h4>Watch for <code>environment:</code></h4><p>It overrides the subject form regardless of trigger. Adding an approval gate later means updating the service user too.</p></div>
+        <div class="card"><h4>Pin Both Versions</h4><p>Pin the action to a SHA and the CLI with <code>cli-version</code>. Unpinned means your pipeline changes without a commit.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p><strong>Reference</strong> &mdash;
+          <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/github-action">GitHub Action</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/workload-identity-federation">Workload identity federation</a> <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/cicd/integrate-ci-cd">All CI/CD integrations</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/connecting/configure-connections">Configure connections</a> <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/snowflake-cli/command-reference/auth-commands/overview">auth oidc commands</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/network-policies">Network policies</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/data-engineering/dbt-projects-on-snowflake-ci-cd">dbt CI/CD</a> <a class="badge-blue" href="https://docs.snowflake.com/en/developer-guide/builders/devops-with-snowflake">DevOps with Snowflake</a>
+          <a class="badge-purple" href="https://github.com/snowflakedb/snowflake-actions">Action source</a> <a class="badge-purple" href="https://www.snowflake.com/en/developers/guides/configure-cicd-integrations-with-snowflake">Developer guide</a>
+          <a class="badge-purple" href="https://docs.github.com/en/actions/reference/security/oidc">GitHub OIDC reference</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

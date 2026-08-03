@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Storage Lifecycle Policies: Archive Before You Pay</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Storage Lifecycle</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Contents</div>
+      <a href="#hero">Overview</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#cool-vs-cold">COOL vs COLD</a>
+      <a href="#creating-a-policy">Creating a Policy</a>
+      <a href="#the-irreversible-choice">The Irreversible Choice</a>
+      <a href="#retrieving-archived-data">Retrieving Archived Data</a>
+      <a href="#what-gets-locked">What Gets Locked</a>
+      <a href="#replication-and-cloning">Replication and Cloning</a>
+      <a href="#where-it-does-not-apply">Where It Does Not Apply</a>
+      <a href="#monitoring-and-cost">Monitoring and Cost</a>
+      <a href="#takeaways">Takeaways</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>Storage Lifecycle Policies: Archive Before You Pay</h1>
+      <p class="subtitle">A schema-level object that moves old rows to cheap storage or deletes them, on a daily schedule, without a warehouse. The savings are real; two of the choices are irreversible.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">4&times;</div><div class="stat-label">COLD is four times cheaper than COOL</div></div>
+        <div class="stat-card"><div class="stat-value">48 h</div><div class="stat-label">Worst-case COLD retrieval time</div></div>
+        <div class="stat-card"><div class="stat-value">Daily</div><div class="stat-label">Automatic runs on shared compute &mdash; no warehouse</div></div>
+        <div class="stat-card"><div class="stat-value">Once</div><div class="stat-label">A table&rsquo;s archive tier is fixed for its lifetime</div></div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>GA since 2025-11-07. Everything here is from the product documentation. Cloud availability differs by tier and is covered in <a href="#cool-vs-cold">COOL vs COLD</a> &mdash; check it before designing, because COLD is not available everywhere. <a class="badge-green" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-11-07-storage-lifecycle-policies-ga">GA note</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Storage lifecycle policies</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="how-it-works">
+      <h2>How It Works</h2>
+      <p style="margin-bottom: 1.5rem;">Two objects and one daily job. No warehouse, no task, no orchestration.</p>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">Step 1</div><div class="step-title">Create policy with a row expression</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 2</div><div class="step-title">Attach to one or more tables</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">Step 3</div><div class="step-title">Snowflake runs it daily</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">Step 4</div><div class="step-title">Rows archive to COOL/COLD, or expire</div></div>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Shared Compute</h4><p>Policies execute on Snowflake-managed shared compute, not your warehouse. There is nothing to size and nothing to suspend.</p></div>
+        <div class="card"><h4>First Run Is Fast</h4><p>Attaching a policy triggers a run within a few minutes. After that it is once daily.</p></div>
+        <div class="card"><h4>Large Jobs Chunk</h4><p>Big operations process incrementally and may span several daily runs. A policy that has not finished is normal, not stuck.</p></div>
+        <div class="card"><h4>Expire or Archive</h4><p>Expiration deletes permanently. Archival moves rows to a cheaper tier for a set period, then expires them.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Applies to standard tables, dynamic tables, and interactive tables <em>that do not auto-refresh</em>. To evaluate your expression, Snowflake temporarily bypasses governance policies on the table &mdash; worth knowing if you are reasoning about masking or row access in an audit. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/storage-lifecycle-policies">Dynamic tables</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/interactive">Interactive tables</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="cool-vs-cold">
+      <h2>COOL vs COLD</h2>
+      <p style="margin-bottom: 1.5rem;">The tier decision is about retrieval time and cloud availability, not just price.</p>
+      <table class="anim-fade">
+        <thead><tr><th></th><th>COOL</th><th>COLD</th></tr></thead>
+        <tbody>
+          <tr><td>Minimum archival period</td><td>90 days</td><td>180 days</td></tr>
+          <tr><td>Storage cost</td><td>Higher</td><td>4&times; cheaper than COOL</td></tr>
+          <tr><td>Retrieval time</td><td>Instant</td><td>Up to 48 hours</td></tr>
+          <tr><td>Retrieval cost</td><td>Higher</td><td>Lower</td></tr>
+          <tr><td>One-time archiving cost</td><td>Same</td><td>Same</td></tr>
+          <tr><td>Cloud availability</td><td>AWS, Azure, GCP</td><td>AWS and GCP only</td></tr>
+          <tr><td>Max files per restore</td><td>&mdash;</td><td>1 million</td></tr>
+        </tbody>
+      </table>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Choose COOL When</h4>
+          <p>Anyone might need the data back on short notice, or the account is on Azure, where COLD is not available. Instant retrieval is the whole value.</p>
+        </div>
+        <div class="card">
+          <h4>Choose COLD When</h4>
+          <p>The data is retained for compliance and realistically will never be read. A 48-hour retrieval window has to be acceptable to whoever might ask for it &mdash; confirm that with them, not for them.</p>
+        </div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Check the cloud first.</strong> Expiration policies work on AWS, Azure, and GCP. COOL works on all three. <strong>COLD is AWS and GCP only.</strong> Designing a COLD tier for an Azure account is a dead end, and the feature is unavailable in the People&rsquo;s Republic of China entirely. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Cloud provider support</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="creating-a-policy">
+      <h2>Creating a Policy</h2>
+      <p style="margin-bottom: 1.5rem;">The policy is a boolean expression over a column. Rows that return true are acted on.</p>
+      <pre class="anim-fade"><span class="comment">-- Expiration only: delete rows older than 7 years.</span>
+<span class="keyword">CREATE</span> STORAGE LIFECYCLE <span class="keyword">POLICY</span> expire_old_events
+  <span class="keyword">AS</span> (event_ts <span class="keyword">TIMESTAMP</span>) <span class="keyword">RETURNS</span> <span class="keyword">BOOLEAN</span> -&gt;
+    event_ts &lt; <span class="keyword">DATEADD</span>(day, -<span class="number">2555</span>, <span class="keyword">CURRENT_TIMESTAMP</span>());
+
+<span class="comment">-- Archive then expire: COLD for 6 years, then gone.</span>
+<span class="comment">-- COLD requires ARCHIVE_FOR_DAYS &gt;= 180.</span>
+<span class="keyword">CREATE</span> STORAGE LIFECYCLE <span class="keyword">POLICY</span> archive_then_expire_finance
+  <span class="keyword">AS</span> (ts <span class="keyword">TIMESTAMP</span>) <span class="keyword">RETURNS</span> <span class="keyword">BOOLEAN</span> -&gt;
+    ts &lt; <span class="keyword">DATEADD</span>(day, -<span class="number">365</span>, <span class="keyword">CURRENT_TIMESTAMP</span>())
+  ARCHIVE_FOR_DAYS = <span class="number">2190</span>
+  ARCHIVE_TIER = COLD;
+
+<span class="comment">-- Attach it. One policy can serve many tables.</span>
+<span class="keyword">ALTER</span> <span class="keyword">TABLE</span> finance.ledger.transactions
+  <span class="keyword">ADD</span> STORAGE LIFECYCLE <span class="keyword">POLICY</span> archive_then_expire_finance <span class="keyword">ON</span> (TXN_TS);</pre>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Reusable</h4><p>A policy is a schema-level object. Attach the same one to many tables and change the rule in one place.</p></div>
+        <div class="card"><h4>Minimums Are Enforced</h4><p>COOL needs <code>ARCHIVE_FOR_DAYS &gt;= 90</code>, COLD needs <code>&gt;= 180</code>. Omit <code>ARCHIVE_FOR_DAYS</code> and you have an expiration-only policy.</p></div>
+        <div class="card"><h4>Any Expression</h4><p>Age is the common case, but the expression is arbitrary boolean logic over the column you bind.</p></div>
+        <div class="card"><h4>Inspect It</h4><p><code>SHOW STORAGE LIFECYCLE POLICIES</code> and <code>DESCRIBE</code> report the tier and period. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/show-storage-lifecycle-policies">SHOW</a> <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/desc-storage-lifecycle-policy">DESCRIBE</a></p></div>
+      </div>
+    </section>
+
+    <section class="slide" id="the-irreversible-choice">
+      <h2>The Irreversible Choice</h2>
+      <p style="margin-bottom: 1.5rem;">The single most important thing to know before you attach an archival policy.</p>
+      <div class="warning-box anim-fade">
+        <p><strong>A table is permanently assigned to its archive tier for its lifetime.</strong> You cannot change COOL to COLD or COLD to COOL. Dropping the policy and attaching a different one does not work either &mdash; the table remembers. Changing the tier requires contacting Snowflake Support to delete the archived data.</p>
+      </div>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Why It Matters</h4>
+          <p>This is a one-way door taken at attach time, usually by whoever was cleaning up storage that week. Getting it wrong means either paying 4&times; more than necessary indefinitely, or living with 48-hour retrieval on data that turned out to be needed.</p>
+        </div>
+        <div class="card">
+          <h4>What To Do</h4>
+          <p>Decide the tier with the data owner before attaching, not after. Ask one question: if someone needs a row back, is a 48-hour wait acceptable? If the answer is no, or unknown, choose COOL.</p>
+        </div>
+      </div>
+      <div class="info-box anim-fade">
+        <p><code>DESCRIBE STORAGE LIFECYCLE POLICY</code> reports <code>archive_tier</code> even after an archival policy has been converted to an expiration-only policy. The tier history is visible &mdash; use it to audit what a table is already committed to before you plan a change. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/desc-storage-lifecycle-policy">DESCRIBE</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Archive tier limitations</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="retrieving-archived-data">
+      <h2>Retrieving Archived Data</h2>
+      <p style="margin-bottom: 1.5rem;">Archived rows are not queryable in place. You restore a copy of exactly the rows you want.</p>
+      <pre class="anim-fade"><span class="comment">-- Look before you pay: row counts and column min/max,</span>
+<span class="comment">-- with NO retrieval cost.</span>
+<span class="keyword">SELECT</span> SYSTEM$<span class="function">GET_TABLE_ARCHIVE_METADATA</span>(<span class="string">'finance.ledger.transactions'</span>);
+
+<span class="comment">-- Restore only the rows you need into a new table.</span>
+<span class="keyword">CREATE</span> TRANSIENT <span class="keyword">TABLE</span> finance.ledger.txn_restore
+  <span class="keyword">FROM</span> ARCHIVE OF finance.ledger.transactions
+  <span class="keyword">WHERE</span> TXN_TS <span class="keyword">BETWEEN</span> <span class="string">'2023-03-15'</span> <span class="keyword">AND</span> <span class="string">'2023-03-25'</span>;</pre>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Check Metadata First</h4><p><code>SYSTEM$GET_TABLE_ARCHIVE_METADATA</code> returns row counts and column min/max without incurring retrieval cost. Use it to confirm the data is even there before paying to pull it. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/functions/system_get_table_archive_metadata">Function reference</a></p></div>
+        <div class="card"><h4>Narrow the WHERE</h4><p>Retrieval is billed. A precise predicate is the difference between restoring a week and restoring a decade.</p></div>
+        <div class="card"><h4>Use TRANSIENT</h4><p>A restore is usually temporary. <code>TRANSIENT</code> avoids Fail-safe storage cost on a table you intend to drop.</p></div>
+        <div class="card"><h4>COLD Takes Hours</h4><p>Up to 48 hours, and a maximum of 1 million files per restore operation. Plan around it &mdash; this is not an interactive workflow.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Removing a policy from a table does not delete archived data; it remains retrievable. Truncating the table also leaves the archive intact. <code>UNDROP</code> within Time Travel restores archived data along with the table. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-retrieving-archived-data">Retrieving archived data</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="what-gets-locked">
+      <h2>What Gets Locked</h2>
+      <p style="margin-bottom: 1.5rem;">The daily run is not free of side effects on concurrent work.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Blocked During a Run</h4>
+          <div class="spec-row"><span class="spec-label">UPDATE</span><span class="spec-value">Locked</span></div>
+          <div class="spec-row"><span class="spec-label">DELETE</span><span class="spec-value">Locked</span></div>
+          <div class="spec-row"><span class="spec-label">MERGE</span><span class="spec-value">Locked</span></div>
+        </div>
+        <div class="card">
+          <h4>Still Allowed</h4>
+          <div class="spec-row"><span class="spec-label">INSERT</span><span class="spec-value">Allowed</span></div>
+          <div class="spec-row"><span class="spec-label">COPY</span><span class="spec-value">Allowed</span></div>
+          <div class="spec-row"><span class="spec-label">SELECT</span><span class="spec-value">Allowed</span></div>
+        </div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>Why this matters for pipeline design:</strong> ingestion keeps working during a policy run, but anything doing merge-style upserts on the same table can block. On a large table the run may span multiple days, widening the window. If a table is both lifecycle-managed and MERGE-updated, expect contention and plan the schedule around it.</p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Performance guidelines resemble those for row access policies &mdash; the expression is evaluated per row, so keep it cheap and aligned with how the table is clustered. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Policy behavior and execution</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="replication-and-cloning">
+      <h2>Replication and Cloning</h2>
+      <p style="margin-bottom: 1.5rem;">Both behave in ways that surprise people, and both have real DR consequences.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Replication</h4>
+          <p>Policies and their table associations replicate. <strong>Archived data does not.</strong> After failover, archived data from the source is not available in the target account.</p>
+          <p>Snowflake never runs secondary policies on secondary tables, even after failover. It pauses execution in the original primary and resumes on failback.</p>
+        </div>
+        <div class="card">
+          <h4>Cloning</h4>
+          <p>Policies are not automatically applied to clones. Archiving from one table in a clone group affects only that table.</p>
+          <p>The result is copies in both standard and archive tiers &mdash; <strong>and you pay for both</strong>. A clone can quietly undo the saving you were chasing.</p>
+        </div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Put this in your DR plan explicitly.</strong> If a compliance obligation is satisfied by archived rows, that obligation is not met in the failover account, because the archive does not travel. Business Critical customers reviewing retention should confirm where the archived copy actually lives before assuming it is covered. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Replication considerations</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="where-it-does-not-apply">
+      <h2>Where It Does Not Apply</h2>
+      <p style="margin-bottom: 1.5rem;">Check this list before promising a customer that lifecycle policies will solve their storage bill.</p>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Shared Tables</h4><p>Not supported on either side of Snowflake data sharing &mdash; neither provider nor consumer tables.</p></div>
+        <div class="card"><h4>Native Apps</h4><p>Not supported.</p></div>
+        <div class="card"><h4>WORM Snapshots</h4><p>Immutable snapshots cannot be modified after creation, so lifecycle policies do not apply.</p></div>
+        <div class="card"><h4>Most UDF Types</h4><p>Python, Java, and Scala UDFs, UDFs with external access, and external functions are all unsupported in the expression.</p></div>
+        <div class="card"><h4>Row Timestamps</h4><p>Not supported.</p></div>
+        <div class="card"><h4>Auto-Refresh Interactive Tables</h4><p>Interactive tables are supported only when they do <em>not</em> auto-refresh. Anything with a target lag is out.</p></div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>Two encryption notes worth carrying into a security review: Tri-Secret Secure can protect archived data with regular key rotation, but <strong>Snowflake does not rekey archived data</strong>. If you suspect key compromise, the documented remedy is to retrieve the archive to a new table (which gets its own key), re-archive it, then drop the original archive. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Archival storage policies</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="monitoring-and-cost">
+      <h2>Monitoring and Cost</h2>
+      <p style="margin-bottom: 1.5rem;">Three cost components, one of which is a penalty most people do not anticipate.</p>
+      <div class="card anim-fade">
+        <h4>Cost Components</h4>
+        <div class="spec-row"><span class="spec-label">One-time archiving cost</span><span class="spec-value">Same for COOL and COLD</span></div>
+        <div class="spec-row"><span class="spec-label">Ongoing archive storage</span><span class="spec-value">COLD is 4&times; cheaper</span></div>
+        <div class="spec-row"><span class="spec-label">Retrieval</span><span class="spec-value">COLD cheaper per byte, slower</span></div>
+        <div class="spec-row"><span class="spec-label">Daily policy execution</span><span class="spec-value">Shared compute, no warehouse</span></div>
+        <div class="spec-row"><span class="spec-label">Early-deletion penalty</span><span class="spec-value">Billed as if kept the full period</span></div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>The penalty-bytes trap:</strong> archived data deleted before <code>ARCHIVE_FOR_DAYS</code> has elapsed is still subject to storage cost for the remainder of the period. Setting a 6-year COLD period and cleaning up after 6 months does not save 5.5 years of storage. Choose the period deliberately &mdash; it is a commitment, not a ceiling. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-billing">Billing</a></p>
+      </div>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Before You Recommend It</h4>
+          <p>Size the win first. Establish how much of the table is actually older than the threshold, then apply the tier discount to that share &mdash; not to the whole table. Rates are in tables 3(e) and 4(f) of the Service Consumption Table. <a class="badge-purple" href="https://www.snowflake.com/legal-files/CreditConsumptionTable.pdf">Consumption table</a></p>
+        </div>
+        <div class="card">
+          <h4>After You Enable It</h4>
+          <p>Monitor policy runs to confirm rows are actually moving and that large operations are progressing across daily runs rather than stalling. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-monitoring">Monitoring</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="takeaways">
+      <h2>Takeaways</h2>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">1</div><div class="step-title">Check cloud + tier availability</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">2</div><div class="step-title">Agree the tier with the data owner</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">3</div><div class="step-title">Set the period deliberately</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">4</div><div class="step-title">Confirm DR coverage</div></div>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>The Tier Is Forever</h4><p>A table is bound to COOL or COLD for its lifetime. Changing it requires Snowflake Support to delete the archive. Decide before attaching.</p></div>
+        <div class="card"><h4>COLD Is Not Everywhere</h4><p>AWS and GCP only. Expiration and COOL cover all three clouds. Check before designing.</p></div>
+        <div class="card"><h4>The Period Is a Commitment</h4><p>Deleting early still bills for the remainder. <code>ARCHIVE_FOR_DAYS</code> is not an upper bound you can walk back.</p></div>
+        <div class="card"><h4>The Archive Does Not Fail Over</h4><p>Policies replicate; archived data does not. If retention compliance rests on the archive, it is not covered in the target account.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p><strong>Reference</strong> &mdash;
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies">Storage lifecycle policies</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-create-manage">Create and manage</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-retrieving-archived-data">Retrieving archived data</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-billing">Billing</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/storage-management/storage-lifecycle-policies-monitoring">Monitoring</a> <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-storage-lifecycle-policy">CREATE POLICY</a> <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/alter-storage-lifecycle-policy">ALTER POLICY</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/functions/system_get_table_archive_metadata">Archive metadata function</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/storage-lifecycle-policies">Dynamic tables</a> <a class="badge-green" href="https://docs.snowflake.com/en/release-notes/2025/other/2025-11-07-storage-lifecycle-policies-ga">GA note</a>
+          <a class="badge-purple" href="https://www.snowflake.com/en/blog/storage-lifecycle-policies-ga/">GA blog post</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

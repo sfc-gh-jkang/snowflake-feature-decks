@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dynamic Tables: Why Your Refresh Went Full</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-alt: #232733;
+      --border: #2e3345;
+      --text: #e4e7ef;
+      --text-muted: #8b92a8;
+      --accent: #29b5f6;
+      --accent-dim: rgba(41, 181, 246, 0.12);
+      --green: #4caf50;
+      --orange: #ff9800;
+      --red: #f44336;
+      --purple: #ab47bc;
+      --sidebar-width: 240px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Progress Bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: var(--accent);
+      z-index: 1000;
+      transition: width 0.1s;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 2rem 1.25rem;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .sidebar .nav-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .sidebar .nav-section-title {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 0.35rem 0.75rem;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      transition: all 0.2s;
+    }
+
+    .sidebar a:hover {
+      color: var(--text);
+      background: var(--surface-alt);
+    }
+
+    .sidebar a.active {
+      color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .sidebar .github-link {
+      position: absolute;
+      bottom: 1.5rem;
+      left: 1.25rem;
+      right: 1.25rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-align: center;
+    }
+
+    .sidebar .github-link:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Main Content */
+    .main {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+    }
+
+    .slide {
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .slide h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .slide h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .slide p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .slide ul, .slide ol {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .slide li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 6rem 3rem 4rem;
+      text-align: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .hero h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .hero .subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stat Grid */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+    }
+
+    /* Two Column */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Three Column */
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    /* Highlight Box */
+    .highlight-box {
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .highlight-box p {
+      color: var(--text);
+    }
+
+    /* Context Box */
+    .context-box {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .context-box p {
+      color: var(--text);
+    }
+
+    /* Warning Box */
+    .warning-box {
+      background: rgba(255, 152, 0, 0.08);
+      border: 1px solid var(--orange);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .warning-box p {
+      color: var(--text);
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(171, 71, 188, 0.08);
+      border: 1px solid var(--purple);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .info-box p {
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin: 2rem 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      text-align: center;
+      min-width: 100px;
+    }
+
+    .flow-step.active {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .flow-step .step-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .flow-step .step-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 1.25rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-alt);
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    td {
+      color: var(--text-muted);
+    }
+
+    /* Code */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      margin: 1rem 0;
+    }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+      background: var(--surface-alt);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .keyword { color: #c792ea; }
+    .string { color: #c3e88d; }
+    .function { color: #82aaff; }
+    .comment { color: #546e7a; }
+    .number { color: #f78c6c; }
+
+    /* Badges */
+    .badge-green {
+      background: rgba(76, 175, 80, 0.15);
+      color: var(--green);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-orange {
+      background: rgba(255, 152, 0, 0.15);
+      color: var(--orange);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-red {
+      background: rgba(244, 67, 54, 0.15);
+      color: var(--red);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-purple {
+      background: rgba(171, 71, 188, 0.15);
+      color: var(--purple);
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-blue {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-decoration: none;
+    }
+    .badge-blue:hover {
+      opacity: 0.85;
+    }
+
+    /* Part Divider */
+    .part-divider {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 4rem 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .part-divider h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+
+    .part-divider h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: var(--text);
+    }
+
+    /* Animations */
+    .anim-fade {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .anim-fade.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .three-col { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.75rem; }
+    }
+
+    /* ---- extensions: components used by sibling decks ---- */
+    .flow-box { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1rem 1.25rem; flex: 1; min-width: 0; }
+    .flow-row { display: flex; align-items: center; gap: 0.75rem;
+      flex-wrap: wrap; margin-bottom: 1rem; }
+    .spec-row { display: flex; justify-content: space-between; gap: 1rem;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-label { color: var(--text-muted); font-size: 0.9rem; }
+    .spec-value { color: var(--text); font-weight: 600; font-size: 0.9rem;
+      text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Evidence table: for claim -> proof matrices. */
+    .evidence td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Print / PDF: drop the fixed sidebar, unhide animated blocks. */
+    @media print {
+      .sidebar, .progress-bar { display: none; }
+      .main { margin-left: 0; max-width: none; }
+      .anim-fade { opacity: 1 !important; transform: none !important; }
+      .slide { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="progress-bar"></div>
+
+  <nav class="sidebar">
+    <h3>Dynamic Tables</h3>
+    <div class="nav-section">
+      <div class="nav-section-title">Concepts</div>
+      <a href="#hero">Overview</a>
+      <a href="#four-modes">Four Modes</a>
+      <a href="#adaptive">ADAPTIVE Refresh</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Diagnosis</div>
+      <a href="#auto-trap">The AUTO Trap</a>
+      <a href="#what-breaks-incremental">What Breaks Incremental</a>
+      <a href="#diagnosing">Diagnosing a Regression</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Design</div>
+      <a href="#five-percent-myth">The 5% Myth</a>
+      <a href="#pipeline-shape">Pipeline Shape</a>
+      <a href="#cost-controls">Cost Controls</a>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-title">Advanced</div>
+      <a href="#custom-incremental">Custom Incremental</a>
+      <a href="#takeaways">Takeaways</a>
+    </div>
+    <a class="github-link" href="https://github.com/sfc-gh-jkang/snowflake-feature-decks">View source</a>
+  </nav>
+
+  <main class="main">
+    <section class="slide hero" id="hero">
+      <h1>Dynamic Tables: Why Your Refresh Went Full</h1>
+      <p class="subtitle">Incremental refresh is not a setting you turn on &mdash; it is a property your query either has or loses. Here is how to tell which, and what it costs.</p>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-value">4</div><div class="stat-label">Snowflake-managed refresh modes, plus custom</div></div>
+        <div class="stat-card"><div class="stat-value">ADAPTIVE</div><div class="stat-label">The new recommended default &mdash; GA 2026-07-30</div></div>
+        <div class="stat-card"><div class="stat-value">11</div><div class="stat-label">Documented conditions that force full refresh</div></div>
+        <div class="stat-card"><div class="stat-value">No</div><div class="stat-label">Automatic fallback threshold &mdash; the 5% rule is a guideline</div></div>
+      </div>
+      <div class="info-box anim-fade">
+        <p>Everything in this deck is documented. Where a recommendation comes from a Snowflake blog or developer guide rather than the product docs, the link says so. <a class="badge-green" href="https://docs.snowflake.com/en/release-notes/2026/other/2026-07-30-dynamic-tables-adaptive-refresh-mode-ga">ADAPTIVE GA</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/refresh-modes">Refresh modes</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="four-modes">
+      <h2>Four Modes, One Decision</h2>
+      <p style="margin-bottom: 1.5rem;">The refresh mode is fixed at creation. Choosing it is the single most consequential decision in a dynamic table definition.</p>
+      <div class="flow-row anim-fade">
+        <div class="flow-box"><h4>ADAPTIVE <span class="badge-green">GA</span></h4><p>Incremental by default; reinitializes automatically when Snowflake detects a bulk change. The documented preference for all incremental workloads.</p></div>
+        <div class="flow-box"><h4>INCREMENTAL</h4><p>Processes only changed rows. Creation <em>fails</em> immediately if the definition is not incrementalizable.</p></div>
+        <div class="flow-box"><h4>FULL</h4><p>Re-executes the whole definition every refresh. Always works. Predictable cost regardless of change volume.</p></div>
+        <div class="flow-box"><h4>AUTO <span class="badge-orange">default</span></h4><p>Resolves once at creation to INCREMENTAL or FULL. Never resolves to ADAPTIVE. This is the trap.</p></div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>The documented guidance is unusually direct:</strong> "Use ADAPTIVE refresh mode as your preferred refresh mode for all incremental workloads." And from the Snowflake engineering blog: "Never use <code>REFRESH_MODE = AUTO</code> in production." <a class="badge-green" href="https://docs.snowflake.com/en/release-notes/2026/other/2026-07-30-dynamic-tables-adaptive-refresh-mode-ga">GA note</a> <a class="badge-purple" href="https://www.snowflake.com/en/blog/whats-new-dynamic-tables-faster-flexible/">Blog: What's new with Dynamic Tables</a></p>
+      </div>
+      <p style="margin-bottom: 1rem;">A fifth mode, <code>CUSTOM_INCREMENTAL</code>, lets you write the refresh logic yourself as MERGE or INSERT DML. It is in Public Preview and covered at the end.</p>
+      <pre class="anim-fade"><span class="comment">-- Mode is set at creation. ALTER cannot change it.</span>
+<span class="keyword">CREATE</span> <span class="keyword">OR</span> <span class="keyword">REPLACE</span> DYNAMIC <span class="keyword">TABLE</span> dt_orders
+  <span class="keyword">TARGET_LAG</span> = <span class="string">'10 minutes'</span>
+  <span class="keyword">WAREHOUSE</span> = transform_wh
+  REFRESH_MODE = ADAPTIVE
+<span class="keyword">AS</span>
+  <span class="keyword">SELECT</span> order_id, customer_id, order_date, total_amount
+  <span class="keyword">FROM</span> raw_orders
+  <span class="keyword">WHERE</span> order_status = <span class="string">'COMPLETED'</span>;</pre>
+    </section>
+
+    <section class="slide" id="adaptive">
+      <h2>ADAPTIVE Refresh</h2>
+      <p style="margin-bottom: 1.5rem;">Generally available since 2026-07-30. It solves the specific failure where one nightly bulk load makes incremental refresh cost more than a rebuild.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>Reinitialization Triggers</h4>
+          <p>Snowflake reinitializes when it judges an incremental refresh more expensive than a rebuild. Documented triggers:</p>
+          <div class="spec-row"><span class="spec-label">INSERT OVERWRITE on a base table</span><span class="spec-value">Reinitializes</span></div>
+          <div class="spec-row"><span class="spec-label">Bulk delete / update, large row fraction</span><span class="spec-value">Reinitializes</span></div>
+          <div class="spec-row"><span class="spec-label">Cortex AI functions, UDFs, external functions</span><span class="spec-value">Usually not</span></div>
+          <div class="spec-row"><span class="spec-label">Projection / filter / sort only</span><span class="spec-value">Usually not</span></div>
+        </div>
+        <div class="card">
+          <h4>Why the Exceptions Make Sense</h4>
+          <p>Where the definition calls expensive per-row operators, re-executing them across every row costs more than the incremental path &mdash; so the heuristic declines to rebuild. Where the definition is trivially incrementalizable, there is nothing to gain.</p>
+          <p>The heuristic is comparing two real costs, not applying a row-count rule.</p>
+        </div>
+      </div>
+      <p style="margin-bottom: 1rem;">Reinitializations are observable, which matters because an unexplained cost spike is otherwise hard to attribute:</p>
+      <pre class="anim-fade"><span class="comment">-- Did it reinitialize, and why?</span>
+<span class="keyword">SELECT</span> NAME, REFRESH_ACTION, REINIT_REASON, REFRESH_START_TIME,
+       <span class="keyword">DATEDIFF</span>(<span class="string">'second'</span>, REFRESH_START_TIME, REFRESH_END_TIME) <span class="keyword">AS</span> DURATION_SEC
+<span class="keyword">FROM</span> <span class="keyword">TABLE</span>(INFORMATION_SCHEMA.<span class="function">DYNAMIC_TABLE_REFRESH_HISTORY</span>(
+             NAME_PREFIX =&gt; <span class="string">'MY_DB.MY_SCHEMA.'</span>,
+             DATA_TIMESTAMP_START =&gt; <span class="keyword">DATEADD</span>(<span class="string">'day'</span>, -<span class="number">7</span>, <span class="keyword">CURRENT_TIMESTAMP</span>())))
+<span class="keyword">WHERE</span> REFRESH_ACTION = <span class="string">'REINITIALIZE'</span>
+<span class="keyword">ORDER</span> <span class="keyword">BY</span> REFRESH_START_TIME DESC;</pre>
+      <div class="context-box anim-fade">
+        <p>ADAPTIVE carries the same requirements as INCREMENTAL: the definition must be incrementalizable, or creation fails. It also inherits the pipeline constraint on upstream full-refresh tables. To limit the cost of an occasional rebuild, pair it with a frozen region or a larger <code>INITIALIZATION_WAREHOUSE</code>. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/functions/dynamic_table_refresh_history">REFRESH_HISTORY</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/frozen-regions">Frozen regions</a></p>
+      </div>
+    </section>
+
+    <section class="part-divider" id="part-diagnosis">
+      <h1>Part 2</h1>
+      <h2>Diagnosis</h2>
+    </section>
+
+    <section class="slide" id="auto-trap">
+      <h2>The AUTO Trap</h2>
+      <p style="margin-bottom: 1.5rem;">AUTO is the default when you omit <code>REFRESH_MODE</code>. It fails quietly in two distinct ways.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>1. It Resolves Silently</h4>
+          <p>With AUTO, an unsupported construct does not raise an error &mdash; creation succeeds and the table becomes FULL refresh. You are billed for full reprocessing on every cycle and nothing told you.</p>
+          <p>With <code>REFRESH_MODE = INCREMENTAL</code> the same definition fails loudly at create time, which is what you want.</p>
+        </div>
+        <div class="card">
+          <h4>2. It Resolves Only Once</h4>
+          <p>AUTO evaluates the definition at creation and locks the result in. It never re-evaluates. If an upstream view is later modified so incremental is no longer possible, refreshes <strong>fail</strong> rather than quietly switching to full.</p>
+        </div>
+      </div>
+      <pre class="anim-fade"><span class="comment">-- Fails immediately: EXCEPT is not incrementalizable.</span>
+<span class="keyword">CREATE</span> <span class="keyword">OR</span> <span class="keyword">REPLACE</span> DYNAMIC <span class="keyword">TABLE</span> dt_unsupported
+  <span class="keyword">TARGET_LAG</span> = <span class="string">'10 minutes'</span> <span class="keyword">WAREHOUSE</span> = transform_wh
+  REFRESH_MODE = INCREMENTAL
+<span class="keyword">AS</span> <span class="keyword">SELECT</span> order_id <span class="keyword">FROM</span> raw_orders
+   EXCEPT <span class="keyword">SELECT</span> order_id <span class="keyword">FROM</span> excluded_orders;
+
+<span class="comment">-- 002711 (0A000): SQL compilation error:</span>
+<span class="comment">--   Dynamic Table 'DT_UNSUPPORTED' is defined with REFRESH_MODE = INCREMENTAL,</span>
+<span class="comment">--   but the query is not supported for incremental refresh.</span>
+
+<span class="comment">-- Same definition with AUTO: succeeds, silently becomes FULL.</span></pre>
+      <div class="warning-box anim-fade">
+        <p><strong>Failing at create time is the feature.</strong> Set the mode explicitly in production so cost is a deliberate choice recorded in the DDL. Reserve AUTO for exploration, then lock the mode in before promoting. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/refresh-modes">Refresh modes</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="what-breaks-incremental">
+      <h2>What Breaks Incremental</h2>
+      <p style="margin-bottom: 1.5rem;">Eleven documented conditions, in four categories. With INCREMENTAL these fail at creation; with AUTO they silently resolve to FULL.</p>
+      <table class="anim-fade">
+        <thead><tr><th>Condition</th><th>Category</th></tr></thead>
+        <tbody>
+          <tr><td><code>EXCEPT</code>, <code>INTERSECT</code>, <code>MINUS</code></td><td>Definition shape</td></tr>
+          <tr><td><code>LIMIT</code> / <code>TOP</code></td><td>Definition shape</td></tr>
+          <tr><td><code>GROUP BY ROLLUP</code> / <code>CUBE</code> / <code>GROUPING SETS</code></td><td>Definition shape</td></tr>
+          <tr><td>Outer joins with non-equality predicates (<code>ON a.id &gt; b.id</code>)</td><td>Definition shape</td></tr>
+          <tr><td><code>WITH RECURSIVE</code></td><td>Definition shape</td></tr>
+          <tr><td>Subqueries outside FROM (<code>WHERE EXISTS</code>, <code>WHERE IN (SELECT ...)</code>)</td><td>Definition shape</td></tr>
+          <tr><td>Non-deterministic functions in SELECT (<code>RANDOM()</code>, <code>UUID_STRING()</code>, <code>CURRENT_TIMESTAMP()</code>)</td><td>Function type</td></tr>
+          <tr><td>SQL UDFs containing subqueries</td><td>Function type</td></tr>
+          <tr><td>External functions</td><td>Function type</td></tr>
+          <tr><td>Upstream dynamic table uses FULL refresh, without a system-derived unique key</td><td>Pipeline shape</td></tr>
+          <tr><td>Change tracking not enabled on a base table</td><td>Configuration</td></tr>
+        </tbody>
+      </table>
+      <div class="info-box anim-fade">
+        <p><code>CURRENT_TIMESTAMP()</code> is worth calling out because the rule is positional, not absolute: timestamp functions <em>are</em> supported in <code>WHERE</code>, <code>HAVING</code>, and <code>QUALIFY</code>, and only break incremental when they appear in the <code>SELECT</code> list. A rolling time filter is fine; stamping a processed-at column is not. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/supported-queries">Supported queries</a></p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>Some computations genuinely cannot be incrementalized. An exact median has to re-sort every value when one row arrives, and a set difference has to compare both full sets. These are not gaps in the implementation &mdash; there is no shortcut that inspects only the new rows.</p>
+      </div>
+    </section>
+
+    <section class="slide" id="diagnosing">
+      <h2>Diagnosing a Full-Refresh Regression</h2>
+      <p style="margin-bottom: 1.5rem;">Start with the resolved mode, not the DDL. What you asked for and what you got can differ.</p>
+      <pre class="anim-fade"><span class="comment">-- 1. What mode is it actually running, and why?</span>
+<span class="keyword">SHOW</span> DYNAMIC <span class="keyword">TABLES</span> <span class="keyword">LIKE</span> <span class="string">'dt_orders'</span>;
+<span class="comment">-- inspect: refresh_mode, refresh_mode_reason</span>
+
+<span class="comment">-- 2. Across a whole schema, find everything not running incrementally.</span>
+<span class="keyword">SELECT</span> <span class="string">"name"</span>, <span class="string">"refresh_mode"</span>, <span class="string">"refresh_mode_reason"</span>, <span class="string">"target_lag"</span>
+<span class="keyword">FROM</span> <span class="keyword">TABLE</span>(<span class="function">RESULT_SCAN</span>(<span class="function">LAST_QUERY_ID</span>()))
+<span class="keyword">WHERE</span> <span class="string">"refresh_mode"</span> &lt;&gt; <span class="string">'INCREMENTAL'</span>;
+
+<span class="comment">-- 3. Is refresh duration trending up? Compare average by action.</span>
+<span class="keyword">SELECT</span> NAME, REFRESH_ACTION, <span class="keyword">COUNT</span>(*) <span class="keyword">AS</span> refreshes,
+       <span class="function">ROUND</span>(<span class="keyword">AVG</span>(<span class="keyword">DATEDIFF</span>(<span class="string">'second'</span>, REFRESH_START_TIME, REFRESH_END_TIME))) <span class="keyword">AS</span> avg_sec
+<span class="keyword">FROM</span> <span class="keyword">TABLE</span>(INFORMATION_SCHEMA.<span class="function">DYNAMIC_TABLE_REFRESH_HISTORY</span>(
+             NAME_PREFIX =&gt; <span class="string">'MY_DB.MY_SCHEMA.'</span>,
+             DATA_TIMESTAMP_START =&gt; <span class="keyword">DATEADD</span>(<span class="string">'day'</span>, -<span class="number">14</span>, <span class="keyword">CURRENT_TIMESTAMP</span>())))
+<span class="keyword">GROUP</span> <span class="keyword">BY</span> NAME, REFRESH_ACTION
+<span class="keyword">ORDER</span> <span class="keyword">BY</span> avg_sec DESC;</pre>
+      <div class="card anim-fade">
+        <h4>Reading <code>refresh_mode_reason</code></h4>
+        <div class="spec-row"><span class="spec-label">NULL</span><span class="spec-value">Incremental is active &mdash; nothing wrong</span></div>
+        <div class="spec-row"><span class="spec-label">QUERY_NOT_SUPPORTED_FOR_INCREMENTAL</span><span class="spec-value">Fix the definition shape</span></div>
+        <div class="spec-row"><span class="spec-label">USER_SPECIFIED_FULL_REFRESH</span><span class="spec-value">Deliberate &mdash; someone set FULL</span></div>
+        <div class="spec-row"><span class="spec-label">UPSTREAM_USES_FULL_REFRESH</span><span class="spec-value">Fix upstream, not this table</span></div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>UPSTREAM_USES_FULL_REFRESH is the one people chase in the wrong place.</strong> The table you are looking at is fine; its parent is forcing the mode. Walk up the pipeline before touching the definition in front of you. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/troubleshoot-refreshes">Troubleshoot refreshes</a></p>
+      </div>
+    </section>
+
+    <section class="part-divider" id="part-design">
+      <h1>Part 3</h1>
+      <h2>Design and Cost</h2>
+    </section>
+
+    <section class="slide" id="five-percent-myth">
+      <h2>The Five Percent Myth</h2>
+      <p style="margin-bottom: 1.5rem;">The most common misconception about dynamic tables, and the docs now have a section dedicated to correcting it.</p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>What People Believe</h4>
+          <p>"If more than 5% of the base table changes, Snowflake automatically switches to full refresh."</p>
+          <p>This is false. There is no automatic switch.</p>
+        </div>
+        <div class="card">
+          <h4>What Actually Happens</h4>
+          <p>Five percent is a <em>performance guideline</em> for when incremental works well. Snowflake never changes a dynamic table's configured refresh mode based on change volume.</p>
+          <p>Exceed it and incremental simply gets slower &mdash; and keeps running, at that cost, indefinitely.</p>
+        </div>
+      </div>
+      <div class="highlight-box anim-fade">
+        <p><strong>Why this matters operationally:</strong> nothing will alert you. A table configured INCREMENTAL whose change rate has grown past the useful range will quietly cost more than FULL would, every cycle, until someone compares refresh durations. That comparison is the only signal.</p>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Consistently high churn</h4><p>Recreate with <code>REFRESH_MODE = FULL</code>.</p></div>
+        <div class="card"><h4>Occasional bulk loads</h4><p>Use <code>ADAPTIVE</code> &mdash; it rebuilds on the spike and resumes incremental after.</p></div>
+        <div class="card"><h4>Heavy recurring deletes</h4><p>FULL is often the right starting point; incremental must scan many files to find deleted rows.</p></div>
+        <div class="card"><h4>Wholesale dimension reloads</h4><p>Faster to rebuild than to diff. Start at FULL.</p></div>
+      </div>
+    </section>
+
+    <section class="slide" id="pipeline-shape">
+      <h2>Pipeline Shape</h2>
+      <p style="margin-bottom: 1.5rem;">Refresh mode is per-table, but one constraint propagates downstream.</p>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">Base</div><div class="step-title">Change tracking ON</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step active"><div class="step-label">DT 1</div><div class="step-title">FULL refresh</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">DT 2</div><div class="step-title">INCREMENTAL &mdash; only if DT 1 has a unique key or frozen region</div></div>
+      </div>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>The Constraint</h4>
+          <p>An INCREMENTAL or ADAPTIVE table can sit downstream of a FULL-refresh table only when that upstream table has a system-derived unique key or a frozen region. Given either, Snowflake can compute row-level changes across full refreshes.</p>
+        </div>
+        <div class="card">
+          <h4>The Non-Obvious Part</h4>
+          <p>In this scenario you must set <code>REFRESH_MODE = INCREMENTAL</code> <strong>explicitly</strong> on the downstream table. AUTO will not resolve to incremental here, so relying on the default silently costs you full refreshes down the chain.</p>
+        </div>
+      </div>
+      <div class="context-box anim-fade">
+        <p>An upstream FULL table does not otherwise force downstream tables to FULL &mdash; each table decides independently. Also note replication and cloning both reinitialize incremental tables: replicated tables reinitialize after failover before resuming, and clones may reinitialize on first refresh. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/input-data-optimization">Input data optimization</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/frozen-regions">Frozen regions</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="cost-controls">
+      <h2>Cost Controls</h2>
+      <p style="margin-bottom: 1.5rem;">Two levers do most of the work: which warehouse absorbs a rebuild, and how often you ask for one.</p>
+      <pre class="anim-fade"><span class="comment">-- Dual-warehouse strategy: size for the rebuild, not the steady state.</span>
+<span class="keyword">CREATE</span> <span class="keyword">OR</span> <span class="keyword">REPLACE</span> DYNAMIC <span class="keyword">TABLE</span> dt_orders
+  <span class="keyword">TARGET_LAG</span> = <span class="string">'10 minutes'</span>
+  <span class="keyword">WAREHOUSE</span> = transform_wh_s              <span class="comment">-- routine incremental refreshes</span>
+  <span class="keyword">INITIALIZATION_WAREHOUSE</span> = transform_wh_xl  <span class="comment">-- occasional reinitialization</span>
+  REFRESH_MODE = ADAPTIVE
+<span class="keyword">AS</span>
+  <span class="keyword">SELECT</span> order_id, customer_id, order_date, total_amount
+  <span class="keyword">FROM</span> raw_orders
+  <span class="keyword">WHERE</span> order_status = <span class="string">'COMPLETED'</span>;</pre>
+      <div class="card-grid anim-fade">
+        <div class="card">
+          <h4>Split the Warehouses</h4>
+          <p>Reinitialization is a full scan; routine incremental refresh is not. Sizing one warehouse for both means over-provisioning for the common case. The Snowflake blog recommends this split explicitly. <a class="badge-purple" href="https://www.snowflake.com/en/blog/whats-new-dynamic-tables-faster-flexible/">Blog</a></p>
+        </div>
+        <div class="card">
+          <h4>Target Lag Is a Cost Dial</h4>
+          <p>Lag sets how often refreshes trigger. Tightening it multiplies refresh count. Ask what freshness the consumer actually needs rather than defaulting low.</p>
+        </div>
+        <div class="card">
+          <h4>Mode Changes Are Not Free</h4>
+          <p><code>ALTER</code> cannot change refresh mode. <code>CREATE OR REPLACE</code> drops and recreates, reinitializing the table <em>and every downstream dependency</em>. Prefer <code>CREATE OR ALTER</code>. <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-dynamic-table">CREATE DYNAMIC TABLE</a></p>
+        </div>
+        <div class="card">
+          <h4>Split Stacked Operators</h4>
+          <p>Definitions stacking GROUP BY, DISTINCT, and window functions can run slower incrementally than fully. Splitting into simpler chained tables often restores incremental efficiency. <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/refresh-optimization">Refresh optimization</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="slide" id="custom-incremental">
+      <h2>Custom Incrementalization</h2>
+      <p style="margin-bottom: 1.5rem;">The escape hatch when a transformation is not expressible in a supported shape. <span class="badge-purple">Public Preview</span></p>
+      <div class="two-col anim-fade">
+        <div class="card">
+          <h4>What It Is</h4>
+          <p><code>CUSTOM_INCREMENTAL</code> lets you define refresh logic directly as MERGE or INSERT DML inside a <code>REFRESH USING</code> clause. Snowflake still owns scheduling, retries, and transactional guarantees; you own how changes land.</p>
+        </div>
+        <div class="card">
+          <h4>When to Reach for It</h4>
+          <p>When a definition needs a construct that forces FULL but the workload genuinely needs incremental economics. It bypasses standard query analysis entirely &mdash; which is the point, and also the risk.</p>
+        </div>
+      </div>
+      <div class="warning-box anim-fade">
+        <p><strong>Bypassing analysis means owning correctness.</strong> Snowflake no longer verifies that your logic produces the same result as re-running the definition. Treat it as a deliberate trade, not a default, and note it is Public Preview &mdash; confirm current status before recommending it for production. <a class="badge-purple" href="https://docs.snowflake.com/en/release-notes/2026/other/2026-05-26-dynamic-tables-custom-incremental">Public Preview note</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/custom-incrementalization">Custom incrementalization</a></p>
+      </div>
+      <div class="context-box anim-fade">
+        <p>The Snowflake developer guide works a full example using <code>CHANGES(INFORMATION =&gt; APPEND_ONLY)</code> to feed only new events while reading a dimension fresh on each refresh &mdash; a useful pattern to read before writing your own. <a class="badge-purple" href="https://www.snowflake.com/en/developers/guides/comprehensive-guide-to-dynamic-tables/">Comprehensive Guide to Dynamic Tables</a></p>
+      </div>
+    </section>
+
+    <section class="slide" id="takeaways">
+      <h2>Takeaways</h2>
+      <div class="flow-diagram anim-fade">
+        <div class="flow-step"><div class="step-label">1</div><div class="step-title">Set the mode explicitly</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">2</div><div class="step-title">Prefer ADAPTIVE</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">3</div><div class="step-title">Verify with SHOW</div></div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-step"><div class="step-label">4</div><div class="step-title">Watch refresh duration</div></div>
+      </div>
+      <div class="card-grid anim-fade">
+        <div class="card"><h4>Never Ship AUTO</h4><p>It hides a FULL resolution at creation and fails outright if the definition later stops being incrementalizable. Explicit modes make cost visible in the DDL.</p></div>
+        <div class="card"><h4>ADAPTIVE Is the Default Answer</h4><p>GA since 2026-07-30 and the documented preference for anything incrementalizable. It handles the bulk-load spike that used to force a choice between two bad modes.</p></div>
+        <div class="card"><h4>Nothing Auto-Switches</h4><p>There is no change-volume threshold. A misconfigured table stays expensive until a human compares refresh durations.</p></div>
+        <div class="card"><h4>Check Upstream First</h4><p><code>UPSTREAM_USES_FULL_REFRESH</code> means the problem is a parent table, not the definition in front of you.</p></div>
+      </div>
+      <div class="context-box anim-fade">
+        <p><strong>Reference</strong> &mdash;
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/refresh-modes">Refresh modes</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/supported-queries">Supported queries</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/refresh-optimization">Refresh optimization</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/decision-guide">Decision guide</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/troubleshoot-refreshes">Troubleshooting</a> <a class="badge-blue" href="https://docs.snowflake.com/en/user-guide/dynamic-tables/custom-incrementalization">Custom incrementalization</a>
+          <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/functions/dynamic_table_refresh_history">REFRESH_HISTORY</a> <a class="badge-blue" href="https://docs.snowflake.com/en/sql-reference/sql/create-dynamic-table">CREATE DYNAMIC TABLE</a> <a class="badge-green" href="https://docs.snowflake.com/en/release-notes/2026/other/2026-07-30-dynamic-tables-adaptive-refresh-mode-ga">ADAPTIVE GA</a>
+          <a class="badge-purple" href="https://www.snowflake.com/en/developers/guides/comprehensive-guide-to-dynamic-tables/">Developer guide</a> <a class="badge-purple" href="https://www.snowflake.com/en/blog/whats-new-dynamic-tables-faster-flexible/">Engineering blog</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    window.addEventListener('scroll', () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      progressBar.style.width = (scrollTop / docHeight * 100) + '%';
+    });
+
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.anim-fade').forEach(el => observer.observe(el));
+
+    // Active nav tracking
+    const sections = document.querySelectorAll('.slide, .part-divider');
+    const navLinks = document.querySelectorAll('.sidebar a');
+
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 200;
+        if (window.scrollY >= sectionTop) {
+          current = section.getAttribute('id');
+        }
+      });
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
