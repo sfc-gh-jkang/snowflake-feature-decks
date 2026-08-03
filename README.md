@@ -4,6 +4,9 @@ Self-contained HTML decks explaining Snowflake features and patterns. Each deck 
 a single file with inline CSS and JS — no build step, no dependencies — served
 directly from GitHub Pages.
 
+Deck links below are absolute GitHub Pages URLs. Relative links would render the
+HTML source instead of the page when this README is viewed on github.com.
+
 Format and styling follow
 [`sfc-gh-perickson/demos-enablement`](https://github.com/sfc-gh-perickson/demos-enablement)
 so these sit alongside that library.
@@ -12,11 +15,11 @@ so these sit alongside that library.
 
 | Topic | Audience | Format | Support status | Link |
 |-------|----------|--------|----------------|------|
-| Interactive Tables, Fed Directly by Snowpipe Streaming | SEs, Solution Architects | Presentation + speaker notes | GA; quickstart-documented | [View](interactive-tables-streaming/presentations/interactive-tables-streaming.html) |
-| Dynamic Tables: Why Your Refresh Went Full | SEs, Analytics Engineers | Presentation + speaker notes | GA (ADAPTIVE GA 2026-07-30) | [View](dynamic-tables-refresh-modes/presentations/dynamic-tables-refresh-modes.html) |
-| Storage Lifecycle Policies: Archive Before You Pay | SEs, Data Engineers, Compliance | Presentation + speaker notes | GA 2025-11-07 (COLD: AWS + GCP only) | [View](storage-lifecycle-policies/presentations/storage-lifecycle-policies.html) |
-| Secretless CI/CD: Deploying to Snowflake from GitHub Actions | SEs, Platform Engineers | Presentation + speaker notes | GA (OIDC needs CLI 3.11+) | [View](github-actions-oidc-cicd/presentations/github-actions-oidc-cicd.html) |
-| Preventing Data Download to Unmanaged Devices | SEs, Security Teams, IAM Owners | Presentation + speaker notes | GA (AGGREGATE_ACCESS_HISTORY preview; 1 claim KB-sourced) | [View](preventing-data-egress-unmanaged-devices/presentations/preventing-data-egress-unmanaged-devices.html) |
+| Interactive Tables, Fed Directly by Snowpipe Streaming | SEs, Solution Architects | Presentation + speaker notes | GA; quickstart-documented | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/interactive-tables-streaming/presentations/interactive-tables-streaming.html) |
+| Dynamic Tables: Why Your Refresh Went Full | SEs, Analytics Engineers | Presentation + speaker notes | GA (ADAPTIVE GA 2026-07-30) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/dynamic-tables-refresh-modes/presentations/dynamic-tables-refresh-modes.html) |
+| Storage Lifecycle Policies: Archive Before You Pay | SEs, Data Engineers, Compliance | Presentation + speaker notes | GA 2025-11-07 (COLD: AWS + GCP only) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/storage-lifecycle-policies/presentations/storage-lifecycle-policies.html) |
+| Secretless CI/CD: Deploying to Snowflake from GitHub Actions | SEs, Platform Engineers | Presentation + speaker notes | GA (OIDC needs CLI 3.11+) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/github-actions-oidc-cicd/presentations/github-actions-oidc-cicd.html) |
+| Preventing Data Download to Unmanaged Devices | SEs, Security Teams, IAM Owners | Presentation + speaker notes | GA (AGGREGATE_ACCESS_HISTORY preview; 1 claim KB-sourced) | [View](https://sfc-gh-jkang.github.io/snowflake-feature-decks/preventing-data-egress-unmanaged-devices/presentations/preventing-data-egress-unmanaged-devices.html) |
 
 ## Claim accuracy
 
