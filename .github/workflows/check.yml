@@ -69,3 +69,20 @@ jobs:
             [ -f "$notes" ] || { echo "FAIL: missing $notes"; exit 1; }
           done
           echo "speaker notes present for all decks"
+
+      # Pages serves this repo with Jekyll (build_type: legacy, no .nojekyll),
+      # and Jekyll silently omits underscore-prefixed paths from the published
+      # site. A needed asset under _assets/ or _tools/ would 404 with no error
+      # anywhere -- in the build log, in CI, or in the repo. Fail at push instead.
+      #
+      # Keeping Jekyll is deliberate: it renders README.md into the catalog page
+      # at the site root, so adding .nojekyll would mean hand-maintaining an
+      # index.html that duplicates the README table.
+      - name: No Jekyll-excluded paths
+        run: |
+          if git ls-files | grep -E '(^|/)_'; then
+            echo "FAIL: the paths above start with '_' and Jekyll excludes them from GitHub Pages."
+            echo "Rename them, or add .nojekyll (which disables the rendered README index)."
+            exit 1
+          fi
+          echo "no underscore-prefixed paths"
