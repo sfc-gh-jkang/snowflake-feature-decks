@@ -78,11 +78,23 @@ jobs:
       # Keeping Jekyll is deliberate: it renders README.md into the catalog page
       # at the site root, so adding .nojekyll would mean hand-maintaining an
       # index.html that duplicates the README table.
+      #
+      # Jekyll's own reserved paths are the exception, because they are consumed
+      # BY the build rather than served by it -- their absence from the output is
+      # correct, not a bug. Without this carve-out the check fails on _config.yml,
+      # which is the only supported way to set a theme or site title, so wanting to
+      # configure the site at all would mean deleting the guard.
       - name: No Jekyll-excluded paths
         run: |
-          if git ls-files | grep -E '(^|/)_'; then
+          offenders=$(git ls-files \
+            | grep -E '(^|/)_' \
+            | grep -vE '^_config\.(yml|yaml)$' \
+            | grep -vE '^_(layouts|includes|sass|data|plugins|posts)/' \
+            || true)
+          if [ -n "$offenders" ]; then
+            echo "$offenders"
             echo "FAIL: the paths above start with '_' and Jekyll excludes them from GitHub Pages."
             echo "Rename them, or add .nojekyll (which disables the rendered README index)."
             exit 1
           fi
-          echo "no underscore-prefixed paths"
+          echo "no unexpected underscore-prefixed paths"
